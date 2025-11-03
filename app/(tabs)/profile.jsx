@@ -16,9 +16,12 @@ import { Link, router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import TabBarSpacer from "../../src/components/TabBarSpacer";
+import { useTranslation } from "react-i18next";
+import "intl-pluralrules";
 
 export default function ProfileScreen() {
   const { colors } = useTheme();
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const tabBarHeight = useBottomTabBarHeight?.() || 0;
 
@@ -81,15 +84,15 @@ export default function ProfileScreen() {
           <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
             <View style={{ alignItems: "center", flex: 1 }}>
               <TText weight="bold">{stats.trips}</TText>
-              <TText dim>Trips</TText>
+              <TText dim>{t("profile.trips_count", { count: stats.trips })}</TText>
             </View>
             <View style={{ alignItems: "center", flex: 1 }}>
               <TText weight="bold">{stats.moments}</TText>
-              <TText dim>Moments</TText>
+              <TText dim>{t("profile.moments_count", { count: stats.moments })}</TText>
             </View>
             <View style={{ alignItems: "center", flex: 1 }}>
               <TText weight="bold">{stats.followers}</TText>
-              <TText dim>Followers</TText>
+              <TText dim>{t("profile.followers_count", { count: stats.followers })}</TText>
             </View>
           </View>
         </Card>

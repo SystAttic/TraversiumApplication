@@ -1,0 +1,53 @@
+{
+  "common": {
+    "appName": "Traversium",
+    "ok": "OK",
+    "cancel": "Cancel",
+    "save": "Save",
+    "loading": "Loading..."
+  },
+  "tabs": {
+    "home": "Home",
+    "trips": "Trips",
+    "search": "Search",
+    "profile": "Profile",
+    "settings": "Settings"
+  },
+  "profile": {
+    "edit": "Edit profile",
+    "followers": "Followers",
+    "moments": "Moments",
+    "trips": "Trips",
+    "trips.mine": "My Trips",
+    "trips.their": "Their Trips",
+    "showMore": "Show more →",
+    "follow": "Follow",
+    "unfollow": "Unfollow",
+    "block": "Block",
+    "unblock": "Unblock",
+    "report": "Report",
+    "followers_count": "{count, plural, one {# follower} other {# followers}}",
+    "trips_count": "{count, plural, one {# trip} other {# trips}}",
+    "moments_count": "{count, plural, one {# moment} other {# moments}}",
+    "welcome_user": "{Welcome, {username}}!"
+  },
+  "search": {
+    "placeholder.mine": "Search your trips (title, tags)",
+    "placeholder.public": "Search public trips (title, tags, locations)",
+    "placeholder.profiles": "Search profiles (name, @username, bio, location)"
+  },
+  "auth": {
+    "signIn": "Sign in",
+    "continueWithGoogle": "Continue with Google",
+    "usernameOrEmail": "Username or Email",
+    "password": "Password",
+    "createAccount": "Create account",
+    "forgotPassword": "Forgot password?"
+  },
+  "settings": {
+    "language": "Language",
+    "chooseLanguage": "Choose your language",
+    "english": "English",
+    "slovene": "Slovenian"
+  }
+}

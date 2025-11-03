@@ -1,6 +1,7 @@
 export const currentUser = {
   id: "u-ozbej",
   username: "ozbej",
+  gender: "male",
   name: "Ozbej Pavc",
   avatar: "https://i.pravatar.cc/200?img=52",
   location: "Ljubljana",

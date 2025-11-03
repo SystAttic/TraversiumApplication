@@ -1,0 +1,53 @@
+{
+  "common": {
+    "appName": "Traversium",
+    "ok": "V redu",
+    "cancel": "Prekliči",
+    "save": "Shrani",
+    "loading": "Nalaganje..."
+  },
+  "tabs": {
+    "home": "Domov",
+    "trips": "Potovanja",
+    "search": "Iskanje",
+    "profile": "Profil",
+    "settings": "Nastavitve"
+  },
+  "profile": {
+    "edit": "Uredi profil",
+    "followers": "Sledilci",
+    "moments": "Trenutki",
+    "trips": "Potovanja",
+    "trips.mine": "Moja potovanja",
+    "trips.their": "Njihova potovanja",
+    "showMore": "Pokaži več →",
+    "follow": "Sledi",
+    "unfollow": "Prenehaj slediti",
+    "block": "Blokiraj",
+    "unblock": "Odblokiraj",
+    "report": "Prijavi",
+    "followers_count": "{count, plural, one {# sledilec} two {# sledilca} few {# sledilci} other {# sledilcev}}",
+    "trips_count": "{count, plural, one {# potovanje} two {# potovanji} few {# potovanja} other {# potovanj}}",
+    "moments_count": "{count, plural, one {# trenutek} two {# trenutka} few {# trenutki} other {# trenutkov}}",
+    "welcome_user": "{gender, select, male {Dobrodošel, {username}} female {Dobrodošla, {username}} other {Dobrodošli, {username}}}!"
+  },
+  "search": {
+    "placeholder.mine": "Išči med tvojimi potovanji (naslov, oznake)",
+    "placeholder.public": "Išči med javnimi potovanji (naslov, oznake, lokacije)",
+    "placeholder.profiles": "Išči profile (ime, @uporabniško ime, bio, lokacija)"
+  },
+  "auth": {
+    "signIn": "Prijava",
+    "continueWithGoogle": "Nadaljuj z Googlom",
+    "usernameOrEmail": "Uporabniško ime ali e-pošta",
+    "password": "Geslo",
+    "createAccount": "Ustvari račun",
+    "forgotPassword": "Pozabljeno geslo?"
+  },
+  "settings": {
+    "language": "Jezik",
+    "chooseLanguage": "Izberite jezik",
+    "english": "Angleščina",
+    "slovene": "Slovenščina"
+  }
+}

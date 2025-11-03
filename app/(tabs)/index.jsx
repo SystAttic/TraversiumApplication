@@ -13,9 +13,11 @@ import { fetchTrips, fetchMe } from "../../src/data/api";
 import SkeletonRect from "../../src/components/skeleton/SkeletonRect";
 import SkeletonText from "../../src/components/skeleton/SkeletonText";
 import { useLoading } from "../../src/providers/LoadingProvider";
+import { useTranslation } from "react-i18next";
 
 export default function HomeScreen() {
   const { colors } = useTheme();
+  const { t } = useTranslation();
   const [me, setMe] = useState(null);
   const [recent, setRecent] = useState(null);
   const { show, hide } = useLoading();
@@ -49,7 +51,7 @@ export default function HomeScreen() {
         <Card>
           {me ? (
             <>
-              <TText weight="bold" size="lg">Hello, {me.name.split(" ")[0]} 👋</TText>
+              <TText weight="bold" size="lg">{t("profile.welcome_user", { username: me.name.split(" ")[0], gender: me.gender })}</TText>
               <TText dim style={{ marginTop: 6 }}>
                 Turn your trips into shareable “Moments”. Invite friends. Re-live together.
               </TText>

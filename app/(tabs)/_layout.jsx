@@ -3,6 +3,7 @@ import { Tabs } from "expo-router";
 import { useTheme } from "../../src/theme";
 import { View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
+import { useTranslation } from "react-i18next";
 
 function TabBackground() {
   const { colors } = useTheme();
@@ -11,6 +12,8 @@ function TabBackground() {
 
 export default function TabsLayout() {
   const { colors } = useTheme();
+  const { t } = useTranslation();
+
   return (
     <Tabs
       screenOptions={{
@@ -24,35 +27,35 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: "Home",
+          title: t("tabs.home"),
           tabBarIcon: ({ color, size }) => <Ionicons name="home" color={color} size={size} />,
         }}
       />
       <Tabs.Screen
         name="trips/index"
         options={{
-          title: "Trips",
+          title: t("tabs.trips"),
           tabBarIcon: ({ color, size }) => <Ionicons name="albums" color={color} size={size} />,
         }}
       />
       <Tabs.Screen
         name="search"
         options={{
-          title: "Search",
+          title: t("tabs.search"),
           tabBarIcon: ({ color, size }) => <Ionicons name="search" color={color} size={size} />,
         }}
       />
       <Tabs.Screen
         name="profile"
         options={{
-          title: "Profile",
+          title: t("tabs.profile"),
           tabBarIcon: ({ color, size }) => <Ionicons name="person-circle" color={color} size={size} />,
         }}
       />
       <Tabs.Screen
         name="settings"
         options={{
-          title: "Settings",
+          title: t("tabs.settings"),
           tabBarIcon: ({ color, size }) => <Ionicons name="settings" color={color} size={size} />,
         }}
       />
