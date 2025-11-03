@@ -14,6 +14,7 @@ import SkeletonRect from "../../src/components/skeleton/SkeletonRect";
 import SkeletonText from "../../src/components/skeleton/SkeletonText";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import TabBarSpacer from "../../src/components/TabBarSpacer";
+import { router } from "expo-router";
 
 export default function VisitorProfile() {
   const { username } = useLocalSearchParams();
@@ -80,7 +81,9 @@ export default function VisitorProfile() {
             onToggleFollow={onToggleFollow}
             onToggleBlock={onToggleBlock}
             onReport={onReport}
-            onEdit={() => {}}
+            onEdit={() => {
+              router.push("/settings/edit-profile");
+            }}
           />
         ) : (
           <Card style={{ padding: 0 }}>

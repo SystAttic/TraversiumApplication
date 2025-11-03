@@ -1,5 +1,5 @@
 // app/(tabs)/settings.jsx
-import React from "react";
+import React, {useState} from "react";
 import { View, Pressable, Platform, ScrollView } from "react-native";
 import Screen from "../../src/components/Screen";
 import AppHeader from "../../src/components/AppHeader";
@@ -13,6 +13,7 @@ import { router } from "expo-router";
 import Constants from "expo-constants";
 import { useTranslation } from "react-i18next";
 import { useLocale } from "../../src/providers/LocaleProvider";
+import ModalConfirm from "../../src/components/ModalConfirm";
 
 // --- small helpers ---
 function getAppVersion() {
@@ -104,6 +105,7 @@ export default function SettingsScreen() {
   const { t } = useTranslation();
   const { colors, mode, setMode, isDark } = useTheme();
   const { lang, setLang } = useLocale();
+  const [signOutVisible, setSignOutVisible] = useState(false);
 
   return (
     <Screen>
@@ -220,7 +222,7 @@ export default function SettingsScreen() {
             <Row
               icon="exit-outline"
               title={t("signOut", { defaultValue: "Sign out" })}
-              onPress={() => router.push("/settings/sign-out")}
+              onPress={() => setSignOutVisible(true)}
             />
             <Row
               icon="trash-outline"
@@ -231,6 +233,22 @@ export default function SettingsScreen() {
           </Card>
         </View>
       </ScrollView>
+      <ModalConfirm
+        visible={signOutVisible}
+        title={t("confirmSignOutTitle", { defaultValue: "Sign out?" })}
+        message={t("confirmSignOutMsg", { defaultValue: "You will need to log in again to access your account." })}
+        confirmText={t("signOut", { defaultValue: "Sign out" })}
+        cancelText={t("cancel", { defaultValue: "Cancel" })}
+        onCancel={() => setSignOutVisible(false)}
+        onConfirm={async () => {
+          try {
+            // await signOut();
+          } finally {
+            setSignOutVisible(false);
+            router.replace("/(auth)/login"); // adjust if your route differs
+          }
+        }}
+      />
     </Screen>
   );
 }

@@ -3,13 +3,11 @@ import { View, Pressable } from "react-native";
 import { useTheme } from "../theme";
 import { spacing } from "../theme/spacing";
 import TText from "./TText";
+import Ionicons from "@expo/vector-icons/Ionicons";
+import { router } from "expo-router";
 
-export default function AppHeader({ title }) {
-  const { colors, mode, setMode, isDark } = useTheme();
-
-  const cycleMode = () => {
-    setMode(mode === "system" ? "light" : mode === "light" ? "dark" : "system");
-  };
+export default function AppHeader({ title, showBell = true }) {
+  const { colors } = useTheme();
 
   return (
     <View
@@ -25,9 +23,21 @@ export default function AppHeader({ title }) {
       }}
     >
       <TText weight="bold" size="lg">{title}</TText>
-      <Pressable onPress={cycleMode}>
-        <TText dim>{mode.toUpperCase()}</TText>
-      </Pressable>
+
+      {showBell ? (
+        <Pressable
+          onPress={() => router.push("/notifications")}
+          hitSlop={10}
+          style={{
+            width: 36, height: 36, borderRadius: 999,
+            alignItems: "center", justifyContent: "center",
+          }}
+          accessibilityRole="button"
+          accessibilityLabel="Open notifications"
+        >
+          <Ionicons name="notifications-outline" size={20} color={colors.text.primary} />
+        </Pressable>
+      ) : <View style={{ width: 36, height: 36 }} />}
     </View>
   );
 }

@@ -66,7 +66,7 @@ export default function ProfileScreen() {
             name={me.displayName || me.name}
             username={me.username}
             description={me.bio}
-            onEdit={() => router.push("/(auth)/register")}
+            onEdit={() => router.push("/settings/edit-profile")}
           />
         ) : (
           <Card style={{ padding: 0 }}>

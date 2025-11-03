@@ -1,6 +1,6 @@
 // app/_layout.jsx
 import "intl-pluralrules";
-import "../src/i18n"; // init translations once
+import "../src/i18n";
 import React from "react";
 import { Stack } from "expo-router";
 import { ThemeProvider } from "../src/theme";
@@ -19,6 +19,13 @@ export default function RootLayout() {
             <Stack.Screen name="trips/[id]" />
             <Stack.Screen name="users/[username]" />
             <Stack.Screen name="users/[username]/trips" />
+            <Stack.Screen name="settings/edit-profile" />
+            <Stack.Screen name="settings/payments" />
+            <Stack.Screen name="settings/followers" />
+            <Stack.Screen name="settings/following" />
+            <Stack.Screen name="settings/blocked" />
+            <Stack.Screen name="settings/licenses" />
+            <Stack.Screen name="settings/delete" />
           </Stack>
         </LoadingProvider>
       </LocaleProvider>

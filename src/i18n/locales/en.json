@@ -29,7 +29,7 @@
     "followers_count": "{count, plural, one {# follower} other {# followers}}",
     "trips_count": "{count, plural, one {# trip} other {# trips}}",
     "moments_count": "{count, plural, one {# moment} other {# moments}}",
-    "welcome_user": "{Welcome, {username}}!"
+    "welcome_user": "Welcome, {username}!"
   },
   "search": {
     "placeholder.mine": "Search your trips (title, tags)",

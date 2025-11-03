@@ -107,7 +107,7 @@ export default function SearchScreen() {
   }, [q, active, me]);
 
   const placeholder = useMemo(() => {
-    if (active === "profiles") return "Search profiles (name, @username, bio, location)";
+    if (active === "profiles") return "Search profiles (name, @username)";
     if (active === "public") return "Search public trips (title, tags, locations)";
     return "Search your trips (title, tags)";
   }, [active]);
