@@ -16,7 +16,7 @@ export default function RootLayout() {
             <Stack.Screen name="index" />
             <Stack.Screen name="(auth)" />
             <Stack.Screen name="(tabs)" />
-            <Stack.Screen name="trips/[id]" />
+            <Stack.Screen name="trips/[id]/index" />
             <Stack.Screen name="users/[username]" />
             <Stack.Screen name="users/[username]/trips" />
             <Stack.Screen name="settings/edit-profile" />
