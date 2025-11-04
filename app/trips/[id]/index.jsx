@@ -139,7 +139,9 @@ export default function TripScreen() {
             }
             renderItem={({ item }) => (
               <View style={{ paddingHorizontal: spacing.xl, paddingBottom: spacing.sm }}>
-                <MomentCard moment={item} mediaById={mediaById} onOpen={() => {}} />
+                <MomentCard moment={item} mediaById={mediaById} onOpen={() => {
+                  router.push(`/trips/${trip.id}/moments/${item.id}`);
+                }} />
               </View>
             )}
             ListEmptyComponent={() => <TText dim style={{ padding: spacing.xl }}>No moments yet.</TText>}

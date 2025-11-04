@@ -101,7 +101,7 @@ export default function TripBottomBar({ active="timeline", onChange, onAction })
         }}
       >
         <Btn icon="albums"   label="Timeline" value="timeline" />
-        <Btn icon="list"     label="Activity" value="activity" />
+        <Btn icon="images"   label="Gallery"  value="gallery" />
         <Pressable
           onPress={() => setExpanded((v) => !v)}
           style={{ alignItems: "center", justifyContent: "center", padding: spacing.sm, marginHorizontal: spacing.md }}
@@ -110,7 +110,7 @@ export default function TripBottomBar({ active="timeline", onChange, onAction })
             <Ionicons name="add-circle" size={32} color={colors.accent.primary} />
           </Animated.View>
         </Pressable>
-        <Btn icon="images"   label="Gallery"  value="gallery" />
+        <Btn icon="list"     label="Activity" value="activity" />
         <Btn icon="settings" label="Settings" value="settings" />
       </View>
     </View>
