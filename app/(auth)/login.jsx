@@ -1,91 +1,106 @@
 import React, { useState } from "react";
-import { View, Pressable } from "react-native";
-import Screen from "../../src/components/Screen";
-import AppHeader from "../../src/components/AppHeader";
-import Card from "../../src/components/Card";
-import TText from "../../src/components/TText";
-import Button from "../../src/components/Button";
-import Input from "../../src/components/Input";
-import { spacing } from "../../src/theme/spacing";
+import { View, TextInput, Pressable, ActivityIndicator } from "react-native";
+import { Link, router } from "expo-router";
 import { useTheme } from "../../src/theme";
-import { router, Link } from "expo-router";
-import { signInWithPassword, signInWithGoogle } from "../../src/auth/session";
-import { useLoading } from "../../src/providers/LoadingProvider";
+import { spacing } from "../../src/theme/spacing";
+import TText from "../../src/components/TText";
+import AuthBackground from "../../src/components/auth/AuthBackground";
+import AuthCard from "../../src/components/auth/AuthCard";
+import { LinearGradient } from "expo-linear-gradient";
+import {
+  auth,
+  signInWithEmailAndPassword,
+} from "../../src/services/firebase";
+import { saveFirebaseSession } from "../../src/auth/firebaseSession";
 
-export default function Login() {
+export default function LoginScreen() {
   const { colors } = useTheme();
-  const { show, hide } = useLoading();
-
-  const [id, setId] = useState(""); // username or email
-  const [pw, setPw] = useState("");
-  const [err, setErr] = useState(null);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
 
   const onLogin = async () => {
-    setErr(null);
-    if (!id || !pw) {
-      setErr("Please enter your username/email and password.");
-      return;
-    }
-    show();
+    setError("");
+    if (!email || !password) { setError("Please enter email and password"); return; }
     try {
-      await signInWithPassword({ usernameOrEmail: id, password: pw });
-      router.replace("/(tabs)");
+      setBusy(true);
+      const cred = await signInWithEmailAndPassword(auth, email.trim(), password);
+      await saveFirebaseSession(cred.user);
+      router.replace("/");
     } catch (e) {
-      setErr(e?.message || "Login failed.");
+      setError(e.message || "Login failed");
     } finally {
-      hide();
-    }
-  };
-
-  const onGoogle = async () => {
-    setErr(null);
-    show();
-    try {
-      const { profile } = await signInWithGoogle();
-      // If no username yet, redirect user to register screen to choose username/displayName
-      if (!profile?.username) {
-        router.replace({ pathname: "/(auth)/register", params: { from: "google" } });
-      } else {
-        router.replace("/(tabs)");
-      }
-    } catch (e) {
-      setErr(e?.message || "Google sign-in failed.");
-    } finally {
-      hide();
+      setBusy(false);
     }
   };
 
   return (
-    <Screen>
-      <AppHeader title="Sign in" />
-      <View style={{ padding: spacing.xl, gap: spacing.lg }}>
-        <Card>
-          <Input
-            label="Username or Email"
-            placeholder="ozbej or you@example.com"
-            value={id}
-            onChangeText={setId}
-          />
-          <Input
-            label="Password"
-            placeholder="Your password"
-            value={pw}
-            onChangeText={setPw}
-            secureTextEntry
-          />
-          {err ? <TText style={{ color: colors?.danger || "#c33" }}>{err}</TText> : null}
-          <Button title="Sign in" onPress={onLogin} style={{ marginTop: spacing.md }} />
-          <Button title="Continue with Google" variant="outline" onPress={onGoogle} style={{ marginTop: spacing.sm }} />
-          <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: spacing.md }}>
-            <Link href="/(auth)/register" asChild>
-              <Pressable><TText dim>Create account</TText></Pressable>
-            </Link>
-            <Link href="/(auth)/forgot" asChild>
-              <Pressable><TText dim>Forgot password?</TText></Pressable>
-            </Link>
-          </View>
-        </Card>
+    <AuthBackground source={require("../../assets/auth_header.jpg")}>
+      <View style={{ alignItems: "center", marginTop: 54 }}>
+        <TText weight="bold" style={{ fontSize: 28, letterSpacing: 2 }}>TRAVERSIUM</TText>
       </View>
-    </Screen>
+
+      <AuthCard style={{ marginTop: 24 }}>
+        <View style={{ flex: 1, justifyContent: "space-between" }}>
+          {/* Top content */}
+          <View>
+            <View style={{ gap: 6, marginBottom: spacing.lg, alignItems: "center" }}>
+              <TText weight="bold" style={{ fontSize: 22 }}>Welcome back</TText>
+              <TText dim size="sm">Sign in to continue your journey</TText>
+            </View>
+          </View>
+
+          {/* Middle content - Inputs centered */}
+          <View style={{ flex: 1, justifyContent: "center", gap: spacing.md }}>
+            {!!error && <TText style={{ color: colors.status.danger }} size="sm" textAlign="center">{error}</TText>}
+            
+            <TextInput
+              placeholder="Email"
+              placeholderTextColor={colors.text.muted}
+              autoCapitalize="none"
+              keyboardType="email-address"
+              value={email}
+              onChangeText={setEmail}
+              style={{ borderWidth:1, borderColor: colors.border, borderRadius: 12, padding: 12, color: colors.text.primary }}
+            />
+            <TextInput
+              placeholder="Password"
+              placeholderTextColor={colors.text.muted}
+              autoCapitalize="none"
+              secureTextEntry
+              value={password}
+              onChangeText={setPassword}
+              style={{ borderWidth:1, borderColor: colors.border, borderRadius: 12, padding: 12, color: colors.text.primary }}
+            />
+          </View>
+
+          {/* Bottom buttons */}
+          <View style={{ gap: spacing.sm }}>
+            <Pressable onPress={onLogin} disabled={busy} style={{ borderRadius: 14, overflow: "hidden" }}>
+              <LinearGradient
+                colors={[colors.accent.primary, colors.accent.primary]}
+                style={{ padding: 14, alignItems: "center" }}
+              >
+                {busy ? <ActivityIndicator color="#fff" /> : <TText style={{ color: "#fff" }}>Sign in</TText>}
+              </LinearGradient>
+            </Pressable>
+
+            <View style={{ flexDirection: "row", justifyContent:"space-between" }}>
+              <Link href="/(auth)/forgot" asChild>
+                <Pressable><TText dim>Forgot password?</TText></Pressable>
+              </Link>
+              <Link href="/(auth)/register" asChild>
+                <Pressable><TText dim>Create an account?</TText></Pressable>
+              </Link>
+            </View>
+          </View>
+        </View>
+      </AuthCard>
+
+      <View style={{ alignItems:"center", marginTop: spacing.lg }}>
+        <TText dim size="sm">© {new Date().getFullYear()} Traversium</TText>
+      </View>
+    </AuthBackground>
   );
 }

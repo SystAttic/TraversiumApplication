@@ -6,28 +6,36 @@ import { useTheme } from "../src/theme";
 import TText from "../src/components/TText";
 import { spacing } from "../src/theme/spacing";
 import { getSession } from "../src/auth/session";
+import { auth, onAuthStateChanged } from "../src/services/firebase";
+import { saveFirebaseSession, clearSavedSession } from "../src/auth/firebaseSession";
 
 export default function Gate() {
   const { colors } = useTheme();
   const [checking, setChecking] = useState(true);
 
   useEffect(() => {
-    let m = true;
-    (async () => {
+    let unsub = null;
+    let mounted = true;
+    // Prefer Firebase auth state; also keep SecureStore token in sync for other consumers
+    unsub = onAuthStateChanged(auth, async (user) => {
       try {
-        const session = await getSession();
-        //await new Promise((res) => setTimeout(res, 1000));
-        if (!m) return;
-        if (session?.token) {
-          router.replace("/(tabs)");      // go to app
+        if (!mounted) return;
+        if (user) {
+          await saveFirebaseSession(user);
+          router.replace("/(tabs)");
         } else {
-          router.replace("/(auth)/login"); // go to auth
+          await clearSavedSession();
+          // No active session → go to Welcome
+          router.replace("/(auth)/welcome");
         }
       } finally {
-        if (m) setChecking(false);
+        if (mounted) setChecking(false);
       }
-    })();
-    return () => (m = false);
+    });
+    return () => {
+      mounted = false;
+      if (unsub) unsub();
+    };
   }, []);
 
   // Branded splash

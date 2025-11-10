@@ -242,10 +242,13 @@ export default function SettingsScreen() {
         onCancel={() => setSignOutVisible(false)}
         onConfirm={async () => {
           try {
-            // await signOut();
+            const { signOut: fbSignOut } = await import("../../src/services/firebase");
+            const { clearSavedSession } = await import("../../src/auth/firebaseSession");
+            await fbSignOut((await import("../../src/services/firebase")).auth);
+            await clearSavedSession();
           } finally {
             setSignOutVisible(false);
-            router.replace("/(auth)/login"); // adjust if your route differs
+            router.replace("/(auth)/welcome"); // go to welcome
           }
         }}
       />
