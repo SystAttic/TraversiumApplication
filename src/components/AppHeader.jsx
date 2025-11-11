@@ -6,7 +6,7 @@ import TText from "./TText";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { router } from "expo-router";
 
-export default function AppHeader({ title, showBell = true }) {
+export default function AppHeader({ title, showBell = true, rightElement }) {
   const { colors } = useTheme();
 
   return (
@@ -24,7 +24,9 @@ export default function AppHeader({ title, showBell = true }) {
     >
       <TText weight="bold" size="lg">{title}</TText>
 
-      {showBell ? (
+      {rightElement ? (
+        rightElement
+      ) : showBell ? (
         <Pressable
           onPress={() => router.push("/notifications")}
           hitSlop={10}
@@ -37,7 +39,9 @@ export default function AppHeader({ title, showBell = true }) {
         >
           <Ionicons name="notifications-outline" size={20} color={colors.text.primary} />
         </Pressable>
-      ) : <View style={{ width: 36, height: 36 }} />}
+      ) : (
+        <View style={{ width: 36, height: 36 }} />
+      )}
     </View>
   );
 }

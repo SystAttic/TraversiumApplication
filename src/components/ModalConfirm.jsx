@@ -1,6 +1,5 @@
 import React from "react";
 import { Modal, View, Pressable } from "react-native";
-import Card from "./Card";
 import TText from "./TText";
 import Button from "./Button";
 import { useTheme } from "../theme";
@@ -28,22 +27,27 @@ export default function ModalConfirm({
         }}
         onPress={onCancel}
       >
-        <Card
+        <View
           style={{
             width: "100%",
             maxWidth: 420,
-            borderRadius: radii.xl,
-            padding: spacing.lg,
+            backgroundColor: colors.bg.layer2,
+            borderRadius: radii.lg,
+            borderWidth: 1,
+            borderColor: colors.border,
+            paddingHorizontal: spacing.xl,
+            paddingVertical: spacing.lg,
+            overflow: "hidden",
           }}
           onStartShouldSetResponder={() => true}
         >
           {title ? <TText weight="bold" size="lg">{title}</TText> : null}
           {message ? <TText dim style={{ marginTop: spacing.sm }}>{message}</TText> : null}
-          <View style={{ flexDirection: "row", gap: spacing.sm, marginTop: spacing.lg, justifyContent: "flex-end" }}>
+          <View style={{ flexDirection: "row", gap: spacing.sm, marginTop: spacing.lg, justifyContent: "center" }}>
             <Button title={cancelText} variant="outline" onPress={onCancel} />
             <Button title={confirmText} onPress={onConfirm} />
           </View>
-        </Card>
+        </View>
       </Pressable>
     </Modal>
   );
