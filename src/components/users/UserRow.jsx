@@ -15,14 +15,14 @@ function UserRowBase({
   onUnblock,
 }) {
   const { colors } = useTheme();
-  const avatar = user?.avatar || "https://i.pravatar.cc/150?img=8";
-  const name = user?.displayName || user?.name || user?.username || "User";
+  const avatar = user?.avatarPhotoReference;
+  const name = user?.displayName || user?.firstName || user?.username || "User";
 
   return (
     <Card style={{ padding: spacing.md }}>
       <Pressable onPress={() => onPress?.(user)} style={{ flexDirection: "row", alignItems: "center" }}>
         <Image
-          source={{ uri: avatar }}
+          source={avatar ? { uri: avatar } : require("../../../assets/profile-default.jpg")}
           style={{ width: 44, height: 44, borderRadius: 999, marginRight: spacing.md }}
         />
         <View style={{ flex: 1 }}>

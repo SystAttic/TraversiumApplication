@@ -17,6 +17,8 @@ import { getAllTrips, searchTripsByTitle } from "../../../src/services/tripApi";
 import { auth } from "../../../src/services/firebase";
 import SkeletonRect from "../../../src/components/skeleton/SkeletonRect";
 import SkeletonText from "../../../src/components/skeleton/SkeletonText";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 
 const ROLE_FILTERS = [
   { key: "all", label: "All Trips" },
@@ -32,6 +34,8 @@ const VISIBILITY_FILTERS = [
 
 export default function TripsList() {
   const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
+  const tabBarHeight = useBottomTabBarHeight?.() || 0;
   const [searchQuery, setSearchQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState("all");
   const [visibilityFilter, setVisibilityFilter] = useState("all");
@@ -231,7 +235,7 @@ export default function TripsList() {
       </View>
 
       <ScrollView
-        contentContainerStyle={{ padding: spacing.xl, gap: spacing.xl }}
+        contentContainerStyle={{ padding: spacing.xl, gap: spacing.xl, paddingBottom: insets.bottom + tabBarHeight + spacing.sm }}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl

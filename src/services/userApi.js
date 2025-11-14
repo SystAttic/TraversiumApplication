@@ -165,3 +165,14 @@ export async function countBlockedUsers() {
   return http(`/rest/v1/users/blocked/count`, { method: "GET" });
 }
 
+/**
+ * Search users by username
+ * @param {string} query - Search query (partial username match)
+ * @param {number} offset - Pagination offset
+ * @param {number} limit - Pagination limit
+ * @returns {Promise<UserDto[]>}
+ */
+export async function searchUsersByUsername(query, offset = 0, limit = 20) {
+  return http(`/rest/v1/users/search?query=${encodeURIComponent(query)}&offset=${offset}&limit=${limit}`, { method: "GET" });
+}
+

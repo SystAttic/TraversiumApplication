@@ -11,8 +11,6 @@ import { fetchTrips, fetchUserByUsername, fetchMe } from "../../../src/data/api"
 import SkeletonRect from "../../../src/components/skeleton/SkeletonRect";
 import SkeletonText from "../../../src/components/skeleton/SkeletonText";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
-import TabBarSpacer from "../../../src/components/TabBarSpacer";
 
 export default function UserTripsList() {
   const { username } = useLocalSearchParams();
@@ -26,35 +24,48 @@ export default function UserTripsList() {
   useEffect(() => {
     let m = true;
     (async () => {
-      const [u, me, all] = await Promise.all([
-        fetchUserByUsername(username),
-        fetchMe(),
-        fetchTrips(),
-      ]);
-      if (!m) return;
-      setOwner(u);
-      setViewer(me);
-      const list = (all || []).filter((t) => (t.contributors || []).includes(u?.username));
-      setTrips(u?.username === me?.username ? list : list.filter((t) => t.visibility === "public"));
+      try {
+        const [u, me, all] = await Promise.all([
+          fetchUserByUsername(username),
+          fetchMe().catch(() => null), // Allow trips view even if current user fetch fails
+          fetchTrips(),
+        ]);
+        if (!m) return;
+        setOwner(u);
+        setViewer(me);
+        // Filter trips where user is owner or collaborator
+        const collaborators = (all || []).filter((t) => {
+          const tripCollaborators = t.collaborators || [];
+          const ownerId = t.ownerId;
+          return tripCollaborators.includes(u?.firebaseId) || ownerId === u?.firebaseId;
+        });
+        const isOwnProfile = u && me && u.firebaseId === me.firebaseId;
+        setTrips(isOwnProfile ? collaborators : collaborators.filter((t) => t.visibility === "PUBLIC"));
+      } catch (error) {
+        console.error("Error loading trips:", error);
+      }
     })();
     return () => (m = false);
   }, [username]);
 
-  const title = owner && viewer && owner.username === viewer.username ? "My Trips" : "Their Trips";
+  const title = owner && viewer && owner.firebaseId === viewer.firebaseId ? "My Trips" : "Their Trips";
 
   return (
     <Screen>
       <AppHeader title={title} />
-      <ScrollView contentContainerStyle={{ padding: spacing.xl, gap: spacing.md, paddingBottom: insets.bottom + 24 }}>
+      <ScrollView contentContainerStyle={{ padding: spacing.xl, gap: spacing.md, paddingBottom: insets.bottom + spacing.sm }}>
         {trips
           ? trips.map((t, i) => (
-              <Link key={t.id || `utl-${i}`} href={`/trips/${t.id}`} asChild>
+              <Link key={t.tripId || `utl-${i}`} href={`/trips/${t.tripId}`} asChild>
                 <Pressable>
                   <Card style={{ padding: 0 }}>
-                    <Image source={{ uri: t.cover }} style={{ width: "100%", height: 140 }} />
+                    <Image 
+                      source={t.coverPhotoUrl ? { uri: t.coverPhotoUrl } : require("../../../assets/cover-default.jpg")} 
+                      style={{ width: "100%", height: 140 }} 
+                    />
                     <View style={{ padding: spacing.lg }}>
                       <TText weight="bold">{t.title || "Untitled Trip"}</TText>
-                      <TText dim>{t.subtitle || ""}</TText>
+                      <TText dim>{t.description || ""}</TText>
                     </View>
                   </Card>
                 </Pressable>
@@ -69,7 +80,6 @@ export default function UserTripsList() {
                 </View>
               </Card>
             ))}
-        <TabBarSpacer useTabBarHeight={false} />
       </ScrollView>
     </Screen>
   );

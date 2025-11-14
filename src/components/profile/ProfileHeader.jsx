@@ -49,7 +49,7 @@ export default function ProfileHeader({
       {/* Cover */}
       <View style={{ width: "100%", height: 160, backgroundColor: colors.bg.layer2 }}>
         <Image
-          source={{ uri: cover || "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?q=80&w=1600&auto=format&fit=crop" }}
+          source={cover ? { uri: cover } : require("../../../assets/cover-default.jpg")}
           style={{ width: "100%", height: "100%" }}
         />
       </View>
@@ -64,7 +64,7 @@ export default function ProfileHeader({
           }}
         >
           <Image
-            source={{ uri: avatar || "https://i.pravatar.cc/200?img=5" }}
+            source={avatar ? { uri: avatar } : require("../../../assets/profile-default.jpg")}
             style={{ width: "100%", height: "100%" }}
           />
         </View>
@@ -76,22 +76,20 @@ export default function ProfileHeader({
         {handle ? <TText dim>{handle}</TText> : null}
       </View>
 
-      {/* Description block (NEW) */}
-      {description ? (
-        <View
-          style={{
-            marginHorizontal: spacing.md,
-            marginBottom: spacing.md,
-            backgroundColor: colors.bg.layer2,
-            borderWidth: 1,
-            borderColor: colors.border,
-            borderRadius: radii.lg,
-            padding: spacing.md,
-          }}
-        >
-          <TText dim>{description}</TText>
-        </View>
-      ) : null}
+      {/* Description block */}
+      <View
+        style={{
+          marginHorizontal: spacing.md,
+          marginBottom: spacing.md,
+          backgroundColor: colors.bg.layer2,
+          borderWidth: 1,
+          borderColor: colors.border,
+          borderRadius: radii.lg,
+          padding: spacing.md,
+        }}
+      >
+        <TText dim>{description || "No description yet."}</TText>
+      </View>
 
       {/* Actions */}
       <Divider />
