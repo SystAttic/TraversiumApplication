@@ -122,7 +122,7 @@ export default function CreateTripScreen() {
     if (!createdTrip) return;
     
     // Generate invitation link (placeholder - will be enhanced with security later)
-    const invitationLink = `traversium://trips/join?tripId=${createdTrip.id}&role=collaborator`;
+    const invitationLink = `traversium://trips/join?tripId=${createdTrip.tripId}&role=collaborator`;
     
     try {
       await Clipboard.setStringAsync(invitationLink);
@@ -136,7 +136,7 @@ export default function CreateTripScreen() {
     if (!createdTrip) return;
     
     // For now, use the deep link. Later this will be https://www.traversium.com/invite?id=...
-    const invitationLink = `traversium://trips/join?tripId=${createdTrip.id}&role=collaborator`;
+    const invitationLink = `traversium://trips/join?tripId=${createdTrip.tripId}&role=collaborator`;
     
     try {
       await Share.share({
@@ -152,7 +152,7 @@ export default function CreateTripScreen() {
 
   // Generate QR code data (placeholder - will be enhanced with security later)
   const qrData = createdTrip
-    ? JSON.stringify({ tripId: createdTrip.id, role: "collaborator" })
+    ? JSON.stringify({ tripId: createdTrip.tripId, role: "collaborator" })
     : null;
 
   return (
@@ -456,7 +456,7 @@ export default function CreateTripScreen() {
                       numberOfLines={1}
                       ellipsizeMode="middle"
                     >
-                      {`traversium://trips/join?tripId=${createdTrip.id}&role=collaborator`}
+                      {`traversium://trips/join?tripId=${createdTrip.tripId}&role=collaborator`}
                     </TText>
                     <Pressable onPress={handleCopyLink} hitSlop={8}>
                       <Ionicons name="copy-outline" size={20} color={colors.accent.primary} />
@@ -481,7 +481,7 @@ export default function CreateTripScreen() {
 
               <View style={{ flexDirection: "row", justifyContent: "flex-end", marginTop: spacing.xl }}>
                 <Pressable
-                  onPress={() => router.replace(`/trips/${createdTrip.id}`)}
+                  onPress={() => router.replace(`/trips/${createdTrip.tripId}`)}
                   style={{ borderRadius: 14, overflow: "hidden", minWidth: 110 }}
                 >
                   <LinearGradient

@@ -216,7 +216,22 @@ export default function TripScreen() {
       )}
 
       {/* Base bottom bar is absolutely positioned; content reserved base height only */}
-      <TripBottomBar active={active} onChange={setActive} onAction={() => {}} />
+      <TripBottomBar 
+        active={active} 
+        onChange={setActive} 
+        onAction={(action) => {
+          if (action === "upload") {
+            // Ensure id is a string (useLocalSearchParams can return array)
+            const tripId = Array.isArray(id) ? id[0] : id;
+            const finalId = String(tripId || trip?.id || trip?.tripId || "");
+            if (finalId) {
+              router.push(`/trips/${finalId}/upload`);
+            } else {
+              console.error("Cannot navigate to upload: no trip ID available");
+            }
+          }
+        }} 
+      />
     </View>
   );
 }
