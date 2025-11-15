@@ -1,13 +1,32 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { View, Image, Pressable, TouchableWithoutFeedback } from "react-native";
+import { View, Image, Pressable, FlatList, Dimensions, TouchableWithoutFeedback } from "react-native";
 import { useLocalSearchParams, router } from "expo-router";
 import { fetchTripById } from "../../../../../../src/data/trips";
 import TText from "../../../../../../src/components/TText";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useTheme } from "../../../../../../src/theme";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { spacing } from "../../../../../../src/theme/spacing";
 
 const UI_HIDE_AFTER = 2500;
+const { width: SCREEN_WIDTH } = Dimensions.get("window");
+
+// Helper to format timestamp
+const formatTime = (timestamp) => {
+  if (!timestamp) return "";
+  const date = new Date(timestamp);
+  const now = new Date();
+  const diffMs = now - date;
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
+
+  if (diffMins < 1) return "Just now";
+  if (diffMins < 60) return `${diffMins}m ago`;
+  if (diffHours < 24) return `${diffHours}h ago`;
+  if (diffDays < 7) return `${diffDays}d ago`;
+  return date.toLocaleDateString();
+};
 
 export default function MediaViewer() {
   const { id, momentId, mediaId } = useLocalSearchParams();
@@ -18,6 +37,10 @@ export default function MediaViewer() {
   const [index, setIndex] = useState(0);
   const [showUI, setShowUI] = useState(true);
   const timer = useRef(null);
+  const flatListRef = useRef(null);
+  const indexRef = useRef(0);
+  const isScrollingProgrammatically = useRef(false);
+  const mediaLengthRef = useRef(0);
 
   useEffect(() => {
     let on = true;
@@ -37,13 +60,35 @@ export default function MediaViewer() {
     return (moment.mediaIds || []).map(mid => byId[mid]).filter(Boolean);
   }, [trip, moment]);
 
+  // Update media length ref
   useEffect(() => {
-    if (!media.length) return;
-    const idx = Math.max(0, media.findIndex(m => m.id === String(mediaId)));
-    setIndex(idx === -1 ? 0 : idx);
+    mediaLengthRef.current = media.length;
+  }, [media.length]);
+
+  // Calculate initial index
+  const initialIndex = useMemo(() => {
+    if (!media.length) return 0;
+    const idx = media.findIndex(m => m.id === String(mediaId));
+    return idx >= 0 ? idx : 0;
   }, [media, mediaId]);
 
+  // Set initial index on mount
+  useEffect(() => {
+    if (initialIndex !== index) {
+      setIndex(initialIndex);
+      indexRef.current = initialIndex;
+    }
+  }, [initialIndex]);
+
   const current = media[index];
+
+  // Get uploader info for current media
+  const uploaderInfo = useMemo(() => {
+    if (!current?.uploader || !trip?.collaborators) return null;
+    const uploader = trip.collaborators.find(u => u.id === current.uploader) || 
+                     trip.collaborators[0];
+    return uploader;
+  }, [current, trip]);
 
   const scheduleHide = () => {
     if (timer.current) clearTimeout(timer.current);
@@ -63,24 +108,104 @@ export default function MediaViewer() {
     if (next) scheduleHide();
   };
 
-  const prev = () => { if (index > 0) setIndex(index - 1); };
-  const nextM = () => { if (index < media.length - 1) setIndex(index + 1); };
+  const prev = () => { 
+    if (index > 0) {
+      isScrollingProgrammatically.current = true;
+      const newIndex = index - 1;
+      setIndex(newIndex);
+      indexRef.current = newIndex;
+      flatListRef.current?.scrollToIndex({ index: newIndex, animated: true });
+      setTimeout(() => {
+        isScrollingProgrammatically.current = false;
+      }, 300);
+    }
+  };
+  
+  const nextM = () => { 
+    if (index < media.length - 1) {
+      isScrollingProgrammatically.current = true;
+      const newIndex = index + 1;
+      setIndex(newIndex);
+      indexRef.current = newIndex;
+      flatListRef.current?.scrollToIndex({ index: newIndex, animated: true });
+      setTimeout(() => {
+        isScrollingProgrammatically.current = false;
+      }, 300);
+    }
+  };
+
+  const onViewableItemsChanged = useRef(({ viewableItems }) => {
+    // Ignore updates during programmatic scrolling
+    if (isScrollingProgrammatically.current) return;
+    
+    if (viewableItems.length > 0 && viewableItems[0].index !== null && viewableItems[0].index !== undefined) {
+      const newIndex = viewableItems[0].index;
+      // Only update if it's actually different to avoid unnecessary re-renders
+      if (newIndex !== indexRef.current && newIndex >= 0 && newIndex < mediaLengthRef.current) {
+        indexRef.current = newIndex;
+        setIndex(newIndex);
+      }
+    }
+  }).current;
+
+  // Update indexRef when index changes
+  useEffect(() => {
+    indexRef.current = index;
+  }, [index]);
+
+  const viewabilityConfig = useRef({
+    itemVisiblePercentThreshold: 50,
+    minimumViewTime: 0,
+  }).current;
+
+  // Fallback: Update index on scroll end
+  const onMomentumScrollEnd = useRef((event) => {
+    if (isScrollingProgrammatically.current) return;
+    
+    const offsetX = event.nativeEvent.contentOffset.x;
+    const newIndex = Math.round(offsetX / SCREEN_WIDTH);
+    
+    if (newIndex !== indexRef.current && newIndex >= 0 && newIndex < mediaLengthRef.current) {
+      indexRef.current = newIndex;
+      setIndex(newIndex);
+    }
+  }).current;
 
   if (!current) {
-    return <View style={{ flex:1, backgroundColor: "black" }} />;
+    return <View style={{ flex: 1, backgroundColor: "black" }} />;
   }
 
   return (
     <View style={{ flex: 1, backgroundColor: "black" }}>
-      {/* tap to toggle UI */}
-      <TouchableWithoutFeedback onPress={toggleUI}>
-        <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
-          <Image
-            source={{ uri: current.uri }}
-            style={{ width: "100%", height: "100%", resizeMode: "contain" }}
-          />
-        </View>
-      </TouchableWithoutFeedback>
+      {/* Swipeable image list */}
+      <FlatList
+        ref={flatListRef}
+        data={media}
+        keyExtractor={(item) => item.id}
+        horizontal
+        pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        onViewableItemsChanged={onViewableItemsChanged}
+        viewabilityConfig={viewabilityConfig}
+        onMomentumScrollEnd={onMomentumScrollEnd}
+        initialScrollIndex={initialIndex}
+        getItemLayout={(data, index) => ({
+          length: SCREEN_WIDTH,
+          offset: SCREEN_WIDTH * index,
+          index,
+        })}
+        renderItem={({ item }) => (
+          <TouchableWithoutFeedback onPress={toggleUI}>
+            <View style={{ width: SCREEN_WIDTH, height: "100%", alignItems: "center", justifyContent: "center" }}>
+              <Image
+                source={{ uri: item.uri }}
+                style={{ width: "100%", height: "100%", resizeMode: "contain" }}
+              />
+            </View>
+          </TouchableWithoutFeedback>
+        )}
+        scrollEnabled={true}
+      />
 
       {/* top bar */}
       {showUI && (
@@ -93,6 +218,7 @@ export default function MediaViewer() {
             flexDirection: "row",
             justifyContent: "space-between",
             alignItems: "center",
+            zIndex: 10,
           }}
           pointerEvents="box-none"
         >
@@ -128,6 +254,7 @@ export default function MediaViewer() {
               backgroundColor: "rgba(0,0,0,0.4)",
               alignItems:"center", justifyContent:"center",
               opacity: index === 0 ? 0.4 : 1,
+              zIndex: 10,
             }}
           >
             <Ionicons name="chevron-back" size={24} color="#fff" />
@@ -141,6 +268,7 @@ export default function MediaViewer() {
               backgroundColor: "rgba(0,0,0,0.4)",
               alignItems:"center", justifyContent:"center",
               opacity: index >= media.length - 1 ? 0.4 : 1,
+              zIndex: 10,
             }}
           >
             <Ionicons name="chevron-forward" size={24} color="#fff" />
@@ -148,13 +276,48 @@ export default function MediaViewer() {
         </>
       )}
 
-      {/* bottom author */}
-      {showUI && (
-        <View style={{ position: "absolute", left: 12, right: 12, bottom: insets.bottom + 10 }}>
-          <TText style={{ color: "#fff" }}>
-            {/* Mock: there’s no author in mock data, so show trip/moment; wire real author later */}
-            {moment?.title} — {current.id}
-          </TText>
+      {/* bottom uploader info */}
+      {showUI && current && (
+        <View style={{ 
+          position: "absolute", 
+          left: spacing.md, 
+          right: spacing.md, 
+          bottom: insets.bottom + spacing.md,
+          flexDirection: "row",
+          alignItems: "center",
+          zIndex: 10,
+        }}>
+          {uploaderInfo && (
+            <>
+              <Image
+                source={{ 
+                  uri: uploaderInfo.avatar || uploaderInfo.avatarPhotoReference || "https://i.pravatar.cc/100?img=1"
+                }}
+                style={{ 
+                  width: 32, 
+                  height: 32, 
+                  borderRadius: 16,
+                  marginRight: spacing.sm,
+                  backgroundColor: "rgba(255,255,255,0.2)",
+                }}
+              />
+              <View style={{ flex: 1 }}>
+                <TText style={{ color: "#fff", fontSize: 14, fontWeight: "500" }}>
+                  {uploaderInfo.displayName || uploaderInfo.username || "Unknown"}
+                </TText>
+                {current.createdAt && (
+                  <TText style={{ color: "rgba(255,255,255,0.7)", fontSize: 12, marginTop: 2 }}>
+                    {formatTime(current.createdAt)}
+                  </TText>
+                )}
+              </View>
+            </>
+          )}
+          {!uploaderInfo && current.createdAt && (
+            <TText style={{ color: "rgba(255,255,255,0.7)", fontSize: 12 }}>
+              {formatTime(current.createdAt)}
+            </TText>
+          )}
         </View>
       )}
     </View>

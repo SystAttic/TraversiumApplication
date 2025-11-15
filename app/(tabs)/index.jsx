@@ -1,5 +1,5 @@
-import React, { useEffect, useState, useMemo } from "react";
-import { ScrollView, View, Image, Pressable } from "react-native";
+import React, { useEffect, useState, useMemo, useCallback } from "react";
+import { ScrollView, View, Image, Pressable, RefreshControl } from "react-native";
 import Screen from "../../src/components/Screen";
 import AppHeader from "../../src/components/AppHeader";
 import Card from "../../src/components/Card";
@@ -23,21 +23,44 @@ export default function HomeScreen() {
   const tabBarHeight = useBottomTabBarHeight?.() || 0;
   const [me, setMe] = useState(null);
   const [allTrips, setAllTrips] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState(null);
+
+  const loadData = useCallback(async (isRefresh = false) => {
+    if (isRefresh) {
+      setRefreshing(true);
+    } else {
+      setLoading(true);
+    }
+    setError(null);
+
+    try {
+      const [u, trips] = await Promise.all([fetchMe(), fetchTrips()]);
+      setMe(u);
+      setAllTrips(trips);
+      setError(null);
+    } catch (err) {
+      console.error("Error loading home data:", err);
+      setError(err);
+      // Don't clear existing data on error during refresh
+      if (!isRefresh) {
+        setMe(null);
+        setAllTrips(null);
+      }
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
 
   useEffect(() => {
-    let mounted = true;
-    (async () => {
-      try {
-        const [u, trips] = await Promise.all([fetchMe(), fetchTrips()]);
-        if (!mounted) return;
-        setMe(u);
-        setAllTrips(trips);
-      } catch (error) {
-        console.error("Error loading home data:", error);
-      }
-    })();
-    return () => (mounted = false);
-  }, []);
+    loadData(false);
+  }, [loadData]);
+
+  const onRefresh = useCallback(() => {
+    loadData(true);
+  }, [loadData]);
 
   // Filter user's trips (where they're owner or collaborator)
   const myTrips = useMemo(() => {
@@ -69,15 +92,74 @@ export default function HomeScreen() {
   const firstName = me?.displayName?.split(" ")[0] || me?.firstName || me?.username || "Traveler";
   const greeting = new Date().getHours() < 12 ? "Good morning" : new Date().getHours() < 18 ? "Good afternoon" : "Good evening";
 
+  // Show error state if there's an error and no data
+  if (error && !me && !allTrips && !loading) {
+    return (
+      <Screen>
+        <AppHeader title="Home" />
+        <ScrollView
+          contentContainerStyle={{
+            flex: 1,
+            justifyContent: "center",
+            alignItems: "center",
+            padding: spacing.xl,
+            paddingBottom: insets.bottom + tabBarHeight + spacing.md,
+          }}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={colors.accent.primary}
+              colors={[colors.accent.primary]}
+            />
+          }
+        >
+          <Card>
+            <View style={{ alignItems: "center", padding: spacing.xl }}>
+              <View
+                style={{
+                  width: 64,
+                  height: 64,
+                  borderRadius: 999,
+                  backgroundColor: colors.bg.layer2,
+                  alignItems: "center",
+                  justifyContent: "center",
+                  marginBottom: spacing.md,
+                }}
+              >
+                <Ionicons name="cloud-offline-outline" size={32} color={colors.text.muted} />
+              </View>
+              <TText weight="bold" size="lg" style={{ marginBottom: spacing.xs, textAlign: "center" }}>
+                Currently Unavailable
+              </TText>
+              <TText dim style={{ textAlign: "center", marginBottom: spacing.lg }}>
+                Please check your internet connection and try again
+              </TText>
+              <Button title="Retry" onPress={() => loadData(false)} />
+            </View>
+          </Card>
+        </ScrollView>
+      </Screen>
+    );
+  }
+
   return (
     <Screen>
       <AppHeader title="Home" />
-      <ScrollView 
-        contentContainerStyle={{ 
-          padding: spacing.xl, 
-          gap: spacing.lg, 
-          paddingBottom: insets.bottom + tabBarHeight + spacing.md 
+      <ScrollView
+        contentContainerStyle={{
+          padding: spacing.xl,
+          gap: spacing.lg,
+          paddingBottom: insets.bottom + tabBarHeight + spacing.md,
         }}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={colors.accent.primary}
+            colors={[colors.accent.primary]}
+          />
+        }
       >
         {/* Welcome Section */}
         <Card>
@@ -104,7 +186,7 @@ export default function HomeScreen() {
                 </Link>
               </View>
             </>
-          ) : (
+          ) : loading ? (
             <>
               <SkeletonText lines={1} />
               <SkeletonText lines={2} style={{ marginTop: spacing.md }} />
@@ -113,7 +195,7 @@ export default function HomeScreen() {
                 <View style={{ flex: 1, height: 44, backgroundColor: colors.bg.layer2, borderRadius: radii.md }} />
               </View>
             </>
-          )}
+          ) : null}
         </Card>
 
         {/* Stats Cards */}

@@ -49,10 +49,16 @@ export default function TripScreen() {
 
   const mediaById = Object.fromEntries((trip.media || []).map(m => [m.id, m]));
 
-  // Fade mini header in after scrolling past the cover
+  // Fade mini header in and hide big header after scrolling past the cover
   const miniOpacity = scrollY.interpolate({
     inputRange: [COVER_H - 40, COVER_H],
     outputRange: [0, 1],
+    extrapolate: "clamp",
+  });
+
+  const coverTranslateY = scrollY.interpolate({
+    inputRange: [0, COVER_H],
+    outputRange: [0, -COVER_H],
     extrapolate: "clamp",
   });
 
@@ -61,7 +67,7 @@ export default function TripScreen() {
       {active === "timeline" ? (
         <>
           {/* Absolute big cover header */}
-          <View
+          <Animated.View
             style={{
               position: "absolute",
               top: 0, left: 0, right: 0,
@@ -69,6 +75,7 @@ export default function TripScreen() {
               backgroundColor: colors.bg.layer3,
               overflow: "hidden",
               zIndex: 1,
+              transform: [{ translateY: coverTranslateY }],
             }}
           >
             <ImageBackground
@@ -90,14 +97,25 @@ export default function TripScreen() {
                 <RoundBtn icon="share-social" onPress={() => { /* copy link */ }} colors={colors} />
               </View>
 
-              {/* Title near bottom */}
-              <View style={{ position: "absolute", left: spacing.xl, right: spacing.xl, bottom: spacing.lg }}>
-                <TText weight="bold" style={{ fontSize: 30 }} numberOfLines={2} adjustsFontSizeToFit>
+              {/* Title and gradient overlay near bottom */}
+              <View 
+                style={{ 
+                  position: "absolute", 
+                  left: 0, 
+                  right: 0, 
+                  bottom: 0,
+                  paddingTop: 60,
+                  paddingHorizontal: spacing.xl,
+                  paddingBottom: spacing.lg,
+                  backgroundColor: "rgba(0,0,0,0.3)",
+                }}
+              >
+                <TText weight="bold" style={{ fontSize: 32, color: "#fff" }} numberOfLines={2}>
                   {trip.title || "Trip"}
                 </TText>
               </View>
             </ImageBackground>
-          </View>
+          </Animated.View>
 
           {/* Mini header pinned (full width, flush top), only visible after cover */}
           <Animated.View
@@ -107,10 +125,12 @@ export default function TripScreen() {
               opacity: miniOpacity,
               zIndex: 2,
             }}
-            pointerEvents="none"
+            pointerEvents="box-none"
           >
             {/* TripMiniHeader has its own safe-area top padding */}
-            <TripMiniHeader trip={trip} />
+            <View style={{ opacity: 1 }}>
+              <TripMiniHeader trip={trip} />
+            </View>
           </Animated.View>
 
           {/* Timeline content below cover; nothing overlays the status bar now */}
@@ -125,20 +145,55 @@ export default function TripScreen() {
             ListHeaderComponent={
               <View
                 style={{
-                  paddingTop: COVER_H,
+                  paddingTop: COVER_H + spacing.lg,
                   paddingHorizontal: spacing.xl,
-                  paddingBottom: spacing.md,
+                  paddingBottom: spacing.lg,
                   backgroundColor: colors.bg.layer1,
                 }}
               >
-                <View style={{ gap: 4 }}>
-                  <TText dim>{trip.description}</TText>
-                  <TText dim>{trip.stats?.moments || 0} moments · {trip.stats?.media || 0} media</TText>
+                {/* Description */}
+                {!!trip.description && (
+                  <TText dim style={{ marginBottom: spacing.md, lineHeight: 20 }}>
+                    {trip.description}
+                  </TText>
+                )}
+
+                {/* Stats and Info Row */}
+                <View style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "center", marginBottom: spacing.md }}>
+                  {/* Moments count */}
+                  <View style={{ flexDirection: "row", alignItems: "center", marginRight: spacing.md, marginBottom: spacing.xs }}>
+                    <Ionicons name="albums-outline" size={16} color={colors.text.muted} />
+                    <TText dim size="sm" style={{ marginLeft: 4 }}>{trip.stats?.moments || 0} moments</TText>
+                  </View>
+
+                  {/* Media count */}
+                  <View style={{ flexDirection: "row", alignItems: "center", marginRight: spacing.md, marginBottom: spacing.xs }}>
+                    <Ionicons name="images-outline" size={16} color={colors.text.muted} />
+                    <TText dim size="sm" style={{ marginLeft: 4 }}>{trip.stats?.media || 0} media</TText>
+                  </View>
+
+                  {/* Visibility */}
+                  <View style={{ flexDirection: "row", alignItems: "center", marginRight: spacing.md, marginBottom: spacing.xs }}>
+                    <Ionicons 
+                      name={trip.visibility === "PUBLIC" ? "globe-outline" : "lock-closed-outline"} 
+                      size={16} 
+                      color={colors.text.muted} 
+                    />
+                    <TText dim size="sm" style={{ marginLeft: 4 }}>{trip.visibility || "PRIVATE"}</TText>
+                  </View>
+
+                  {/* Collaborators count */}
+                  {Array.isArray(trip.collaborators) && trip.collaborators.length > 0 && (
+                    <View style={{ flexDirection: "row", alignItems: "center", marginRight: spacing.md, marginBottom: spacing.xs }}>
+                      <Ionicons name="people-outline" size={16} color={colors.text.muted} />
+                      <TText dim size="sm" style={{ marginLeft: 4 }}>{trip.collaborators.length} collaborator{trip.collaborators.length !== 1 ? "s" : ""}</TText>
+                    </View>
+                  )}
                 </View>
               </View>
             }
             renderItem={({ item }) => (
-              <View style={{ paddingHorizontal: spacing.xl, paddingBottom: spacing.sm }}>
+              <View style={{ paddingHorizontal: spacing.xl, paddingBottom: spacing.md }}>
                 <MomentCard moment={item} mediaById={mediaById} onOpen={() => {
                   router.push(`/trips/${trip.id}/moments/${item.id}`);
                 }} />

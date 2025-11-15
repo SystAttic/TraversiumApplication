@@ -20,7 +20,7 @@ export default function TabsLayout() {
         headerShown: false,
         tabBarActiveTintColor: colors.accent.primary,
         tabBarInactiveTintColor: colors.text.muted,
-        tabBarStyle: { backgroundColor: colors.bg.layer2, borderTopColor: colors.border },
+        tabBarStyle: { backgroundColor: colors.bg.layer2, borderTopColor: colors.border, borderTopWidth: 1 },
         tabBarBackground: () => <TabBackground />,
       }}
     >

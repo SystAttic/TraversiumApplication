@@ -49,6 +49,8 @@ const media = Array.from({ length: 48 }, (_, i) => ({
   uri: `https://picsum.photos/seed/trv-${i+1}/${(i%3===0)?640:480}/${(i%2===0)?480:640}`,
   w: (i%3===0)?640:480,
   h: (i%2===0)?480:640,
+  uploader: users[i % users.length].id, // Assign uploader from users array
+  createdAt: Date.now() - (i * 1000 * 60 * 60 * 2), // Stagger timestamps (2 hours apart)
 }));
 
 const moments = [
@@ -102,16 +104,44 @@ export async function fetchTripById(id, { me = "u1" } = {}) {
 
 export async function fetchTripActivity(id, { page = 0, pageSize = 20 } = {}) {
   await new Promise(r => setTimeout(r, 180));
-  const events = Array.from({ length: pageSize }, (_, i) => ({
-    id: `a${page*pageSize+i+1}`,
-    type: ["create_moment","upload_media","delete_moment","invite_user"][i%4],
-    text:
-      i%4===0 ? "Maja created moment “Café Morning”" :
-      i%4===1 ? "Ožbej uploaded 12 photos" :
-      i%4===2 ? "Dejan deleted moment “Draft: Lunch”" :
-                "Invited @friend to collaborate",
-    time: Date.now() - 1000 * 60 * (i + 1 + page*pageSize),
-    level: (i%7===0) ? "warning" : (i%11===0 ? "error" : "info"),
-  }));
+  
+  const activityTypes = [
+    "UPLOAD", "ARRANGE", "DELETE_MEDIA", "DELETE_MOMENT", 
+    "CHANGE_TRIP_INFO", "INVITED_PERSON", "NEW_COLLABORATOR", "NEW_VIEWER"
+  ];
+  
+  const activityTexts = {
+    "UPLOAD": ["uploaded 12 photos", "uploaded 5 videos", "uploaded 3 images"],
+    "ARRANGE": ["rearranged moments", "organized media", "sorted moments"],
+    "DELETE_MEDIA": ["deleted photo", "removed media", "deleted image"],
+    "DELETE_MOMENT": ["deleted moment \"Café Morning\"", "removed moment \"Draft: Lunch\"", "deleted moment"],
+    "CHANGE_TRIP_INFO": ["changed trip title", "updated description", "modified trip settings"],
+    "INVITED_PERSON": ["invited @friend to collaborate", "sent invitation to user", "invited new member"],
+    "NEW_COLLABORATOR": ["added new collaborator", "granted edit access", "promoted to collaborator"],
+    "NEW_VIEWER": ["added viewer", "granted view access", "added new viewer"],
+  };
+
+  const events = Array.from({ length: pageSize }, (_, i) => {
+    const typeIndex = i % activityTypes.length;
+    const type = activityTypes[typeIndex];
+    const textOptions = activityTexts[type];
+    const textIndex = Math.floor(i / activityTypes.length) % textOptions.length;
+    const userIndex = i % users.length;
+    const user = users[userIndex];
+    
+    return {
+      id: `a${page*pageSize+i+1}`,
+      type,
+      text: `${user.displayName} ${textOptions[textIndex]}`,
+      time: Date.now() - 1000 * 60 * (i + 1 + page*pageSize),
+      user: {
+        id: user.id,
+        username: user.username,
+        displayName: user.displayName,
+        avatar: user.avatar,
+      },
+    };
+  });
+  
   return { items: events, hasMore: page < 2 };
 }

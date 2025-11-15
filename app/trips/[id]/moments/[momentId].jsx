@@ -78,23 +78,23 @@ export default function MomentScreen() {
           paddingTop: spacing.md,
         }}
       >
-        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.md }}>
-          <TText weight="bold" style={{ fontSize: 18 }} numberOfLines={2}>
+        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: spacing.xs }}>
+          <TText weight="bold" style={{ fontSize: 18, flex: 1, marginRight: spacing.md }} numberOfLines={2}>
             {moment.title}
           </TText>
 
-          <View style={{ flexDirection: "row", gap: 16 }}>
-            <Pressable style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+          <View style={{ flexDirection: "row", alignItems: "center" }}>
+            <Pressable style={{ flexDirection: "row", alignItems: "center", marginRight: spacing.md }}>
               <Ionicons name="heart-outline" size={18} color={colors.text.primary} />
-              <TText dim size="sm">24</TText>
+              <TText dim size="sm" style={{ marginLeft: 4 }}>24</TText>
             </Pressable>
 
             <Pressable
               onPress={() => router.push(`/trips/${id}/moments/${momentId}/comments`)}
-              style={{ flexDirection: "row", alignItems: "center", gap: 6 }}
+              style={{ flexDirection: "row", alignItems: "center" }}
             >
               <Ionicons name="chatbubble-ellipses-outline" size={18} color={colors.text.primary} />
-              <TText dim size="sm">12</TText>
+              <TText dim size="sm" style={{ marginLeft: 4 }}>12</TText>
             </Pressable>
           </View>
         </View>

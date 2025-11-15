@@ -41,9 +41,11 @@ export default function FilterBar({ filters, activeFilter, onFilterChange, horiz
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={{ paddingRight: spacing.xl }}
       >
-        <View style={{ flexDirection: "row", gap: spacing.sm }}>
-          {filters.map((filter) => (
-            <FilterItem key={filter.key} filter={filter} />
+        <View style={{ flexDirection: "row" }}>
+          {filters.map((filter, idx) => (
+            <View key={filter.key} style={{ marginLeft: idx > 0 ? spacing.sm : 0 }}>
+              <FilterItem filter={filter} />
+            </View>
           ))}
         </View>
       </ScrollView>
@@ -51,9 +53,11 @@ export default function FilterBar({ filters, activeFilter, onFilterChange, horiz
   }
 
   return (
-    <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.sm }}>
-      {filters.map((filter) => (
-        <FilterItem key={filter.key} filter={filter} />
+    <View style={{ flexDirection: "row", flexWrap: "wrap" }}>
+      {filters.map((filter, idx) => (
+        <View key={filter.key} style={{ marginRight: spacing.sm, marginBottom: spacing.sm }}>
+          <FilterItem filter={filter} />
+        </View>
       ))}
     </View>
   );
