@@ -94,7 +94,7 @@ export default function UploadMediaScreen() {
     setUploadError(null);
     setStep(2);
 
-    const uploadedFileIds = [];
+    const uploadedFileIdsLocal = [];
     const errors = [];
     let defaultAlbumId = null;
 
@@ -145,7 +145,8 @@ export default function UploadMediaScreen() {
           // Upload to file storage
           const uploadResult = await uploadMediaFile(fileObj);
           fileId = uploadResult.fileID;
-          uploadedFileIds.push(fileId);
+          uploadedFileIdsLocal.push(fileId);
+          setUploadedFileIds([...uploadedFileIdsLocal]);
 
           // Update progress (50% for file storage upload)
           setUploadProgress(((i + 0.5) / selectedImages.length) * 100);
@@ -176,9 +177,10 @@ export default function UploadMediaScreen() {
           if (fileId) {
             try {
               await deleteMediaFile(fileId);
-              const index = uploadedFileIds.indexOf(fileId);
+              const index = uploadedFileIdsLocal.indexOf(fileId);
               if (index > -1) {
-                uploadedFileIds.splice(index, 1);
+                uploadedFileIdsLocal.splice(index, 1);
+                setUploadedFileIds([...uploadedFileIdsLocal]);
               }
             } catch (deleteError) {
               console.error(`Failed to delete file ${fileId} during rollback:`, deleteError);
@@ -189,14 +191,14 @@ export default function UploadMediaScreen() {
         }
       }
 
-      if (errors.length > 0 && uploadedFileIds.length === 0) {
+      if (errors.length > 0 && uploadedFileIdsLocal.length === 0) {
         // All uploads failed
         throw new Error("Failed to upload any files. Please try again.");
       }
 
       if (errors.length > 0) {
         // Some files failed, but some succeeded
-        const errorMsg = `${errors.length} file(s) failed to upload. ${uploadedFileIds.length} file(s) uploaded successfully.`;
+        const errorMsg = `${errors.length} file(s) failed to upload. ${uploadedFileIdsLocal.length} file(s) uploaded successfully.`;
         Alert.alert("Partial Upload", errorMsg);
       }
 
@@ -240,7 +242,13 @@ export default function UploadMediaScreen() {
   };
 
   const handleManualArrangement = () => {
-    router.push(`/trips/${tripId}/upload/manual-arrange`);
+    // Pass uploaded file IDs (pathUrls) so manual-arrange only shows newly uploaded media
+    router.push({
+      pathname: `/trips/${tripId}/upload/manual-arrange`,
+      params: {
+        uploadedFileIds: JSON.stringify(uploadedFileIds),
+      },
+    });
   };
 
   const handleAutoArrangement = () => {
