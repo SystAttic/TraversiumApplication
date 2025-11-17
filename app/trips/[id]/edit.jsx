@@ -3,7 +3,8 @@ import { View, ScrollView, TextInput, Pressable, ActivityIndicator, Alert } from
 import { useLocalSearchParams, router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import PageMiniHeader from "../../../src/components/PageMiniHeader";
-import { fetchTripById } from "../../../src/data/trips";
+import { getTripById, updateTrip } from "../../../src/services/tripApi";
+import { auth } from "../../../src/services/firebase";
 import TText from "../../../src/components/TText";
 import Button from "../../../src/components/Button";
 import Input from "../../../src/components/Input";
@@ -27,18 +28,43 @@ export default function EditTripScreen() {
   useEffect(() => {
     let on = true;
     (async () => {
-      const t = await fetchTripById(String(id || "t1"));
-      if (!on) return;
-      setTrip(t);
-      setTitle(t?.title || "");
-      setDescription(t?.description || "");
-      setVisibility(t?.visibility || "PRIVATE");
-      setLoading(false);
+      try {
+        setLoading(true);
+        const tripIdNum = Number(Array.isArray(id) ? id[0] : id);
+        if (!tripIdNum || isNaN(tripIdNum)) {
+          console.error("Invalid trip ID:", id);
+          return;
+        }
+        
+        const tripData = await getTripById(tripIdNum);
+        if (!on) return;
+        
+        const currentUserId = auth.currentUser?.uid || null;
+        const isCollaborator = tripData.collaborators?.includes(currentUserId) || false;
+        const isOwner = tripData.ownerId === currentUserId;
+        
+        const transformedTrip = {
+          ...tripData,
+          id: String(tripData.tripId),
+          isCollaborator: isCollaborator || isOwner,
+          ownerId: tripData.ownerId,
+          currentUserId,
+        };
+        
+        setTrip(transformedTrip);
+        setTitle(tripData.title || "");
+        setDescription(tripData.description || "");
+        setVisibility(tripData.visibility?.toString() || "PRIVATE");
+      } catch (error) {
+        console.error("Failed to load trip:", error);
+      } finally {
+        if (on) setLoading(false);
+      }
     })();
     return () => { on = false; };
   }, [id]);
 
-  const canEdit = !!trip?.isCollaborator || trip?.ownerId === trip?.currentUserId;
+  const canEdit = trip?.isCollaborator || trip?.ownerId === trip?.currentUserId;
 
   const handleSave = async () => {
     if (!title.trim()) {
@@ -48,11 +74,30 @@ export default function EditTripScreen() {
 
     setSaving(true);
     try {
-      // TODO: Call API to update trip
+      const tripIdNum = Number(Array.isArray(id) ? id[0] : id);
+      if (!tripIdNum || isNaN(tripIdNum)) {
+        throw new Error("Invalid trip ID");
+      }
+      
+      const tripDto = {
+        tripId: tripIdNum,
+        title: title.trim(),
+        description: description.trim() || null,
+        visibility: visibility,
+        coverPhotoUrl: trip?.coverPhotoUrl || null,
+        ownerId: trip?.ownerId || null,
+        collaborators: trip?.collaborators || [],
+        viewers: trip?.viewers || [],
+        defaultAlbum: trip?.defaultAlbum || null,
+        albums: trip?.albums || [],
+      };
+      
+      await updateTrip(tripDto);
       Alert.alert("Success", "Trip updated successfully", [
         { text: "OK", onPress: () => router.back() }
       ]);
     } catch (error) {
+      console.error("Failed to update trip:", error);
       Alert.alert("Error", error?.message || "Failed to update trip");
     } finally {
       setSaving(false);

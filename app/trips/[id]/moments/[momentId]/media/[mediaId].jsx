@@ -1,7 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { View, Image, Pressable, FlatList, Dimensions, TouchableWithoutFeedback } from "react-native";
 import { useLocalSearchParams, router } from "expo-router";
-import { fetchTripById } from "../../../../../../src/data/trips";
+import { getTripById } from "../../../../../../src/services/tripApi";
+import { getMediaFileUrl } from "../../../../../../src/services/fileStorageApi";
+import { auth } from "../../../../../../src/services/firebase";
 import TText from "../../../../../../src/components/TText";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useTheme } from "../../../../../../src/theme";
@@ -45,9 +47,94 @@ export default function MediaViewer() {
   useEffect(() => {
     let on = true;
     (async () => {
-      const t = await fetchTripById(String(id || "t1"));
-      if (!on) return;
-      setTrip(t);
+      try {
+        const tripIdNum = Number(Array.isArray(id) ? id[0] : id);
+        if (!tripIdNum || isNaN(tripIdNum)) {
+          console.error("Invalid trip ID:", id);
+          return;
+        }
+        
+        const tripData = await getTripById(tripIdNum);
+        if (!on) return;
+        
+        // Transform API response to UI format (same as index.jsx)
+        const currentUserId = auth.currentUser?.uid || null;
+        const isCollaborator = tripData.collaborators?.includes(currentUserId) || false;
+        const isOwner = tripData.ownerId === currentUserId;
+        
+        // Flatten media from all albums
+        const allMedia = [];
+        const moments = [];
+        
+        tripData.albums?.forEach((album) => {
+          // Skip default album for moments list
+          if (album.albumId === tripData.defaultAlbum) {
+            // Add media from default album to allMedia
+            album.media?.forEach((m) => {
+              allMedia.push({
+                id: String(m.mediaId),
+                uri: getMediaFileUrl(m.pathUrl),
+                uploader: m.uploader,
+                createdAt: m.createdAt ? new Date(m.createdAt).getTime() : Date.now(),
+              });
+            });
+          } else {
+            // Create moment from album
+            const albumMedia = album.media || [];
+            const coverMedia = albumMedia[0];
+            moments.push({
+              id: String(album.albumId),
+              title: album.title || "Untitled Moment",
+              description: album.description || "",
+              coverUri: coverMedia ? getMediaFileUrl(coverMedia.pathUrl) : null,
+              mediaIds: albumMedia.map((m) => String(m.mediaId)),
+              createdBy: coverMedia?.uploader || tripData.ownerId,
+              createdAt: album.createdAt ? new Date(album.createdAt).getTime() : Date.now(),
+            });
+            
+            // Add media from this album
+            albumMedia.forEach((m) => {
+              allMedia.push({
+                id: String(m.mediaId),
+                uri: getMediaFileUrl(m.pathUrl),
+                uploader: m.uploader,
+                createdAt: m.createdAt ? new Date(m.createdAt).getTime() : Date.now(),
+              });
+            });
+          }
+        });
+        
+        // Transform collaborators (for now just IDs, will need user API later)
+        const collaborators = tripData.collaborators?.map((firebaseId) => ({
+          id: firebaseId,
+          username: firebaseId, // Placeholder
+          displayName: firebaseId, // Placeholder
+        })) || [];
+        
+        const transformedTrip = {
+          id: String(tripData.tripId),
+          tripId: tripData.tripId,
+          title: tripData.title || "",
+          description: tripData.description || "",
+          coverUri: tripData.coverPhotoUrl || null,
+          visibility: tripData.visibility || "PRIVATE",
+          ownerId: tripData.ownerId,
+          currentUserId,
+          isCollaborator: isCollaborator || isOwner,
+          isViewer: !isCollaborator && !isOwner,
+          collaborators,
+          media: allMedia,
+          moments,
+          stats: {
+            moments: moments.length,
+            media: allMedia.length,
+          },
+        };
+        
+        setTrip(transformedTrip);
+      } catch (error) {
+        console.error("Failed to load trip:", error);
+      }
     })();
     return () => { on = false; };
   }, [id]);

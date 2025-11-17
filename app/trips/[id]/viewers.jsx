@@ -3,7 +3,8 @@ import { View, ActivityIndicator, FlatList, Pressable, Alert } from "react-nativ
 import { useLocalSearchParams, router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import PageMiniHeader from "../../../src/components/PageMiniHeader";
-import { fetchTripById } from "../../../src/data/trips";
+import { getTripById, removeViewerFromTrip } from "../../../src/services/tripApi";
+import { auth } from "../../../src/services/firebase";
 import TText from "../../../src/components/TText";
 import Card from "../../../src/components/Card";
 import UserRow from "../../../src/components/users/UserRow";
@@ -24,16 +25,50 @@ export default function ViewersScreen() {
   useEffect(() => {
     let on = true;
     (async () => {
-      const t = await fetchTripById(String(id || "t1"));
-      if (!on) return;
-      setTrip(t);
-      setLoading(false);
+      try {
+        setLoading(true);
+        const tripIdNum = Number(Array.isArray(id) ? id[0] : id);
+        if (!tripIdNum || isNaN(tripIdNum)) {
+          console.error("Invalid trip ID:", id);
+          return;
+        }
+        
+        const tripData = await getTripById(tripIdNum);
+        if (!on) return;
+        
+        const currentUserId = auth.currentUser?.uid || null;
+        const isCollaborator = tripData.collaborators?.includes(currentUserId) || false;
+        const isOwner = tripData.ownerId === currentUserId;
+        
+        // Transform viewers (for now just IDs, will need user API later)
+        const viewers = tripData.viewers?.map((firebaseId) => ({
+          id: firebaseId,
+          username: firebaseId, // Placeholder
+          displayName: firebaseId, // Placeholder
+        })) || [];
+        
+        const transformedTrip = {
+          ...tripData,
+          id: String(tripData.tripId),
+          tripId: tripData.tripId,
+          isCollaborator: isCollaborator || isOwner,
+          ownerId: tripData.ownerId,
+          currentUserId,
+          viewers,
+        };
+        
+        setTrip(transformedTrip);
+      } catch (error) {
+        console.error("Failed to load trip:", error);
+      } finally {
+        if (on) setLoading(false);
+      }
     })();
     return () => { on = false; };
   }, [id]);
 
   const viewers = Array.isArray(trip?.viewers) ? trip.viewers : [];
-  const canEdit = !!trip?.isCollaborator || trip?.ownerId === trip?.currentUserId;
+  const canEdit = trip?.isCollaborator || trip?.ownerId === trip?.currentUserId;
 
   const filteredViewers = useMemo(() => {
     if (!searchQuery.trim()) return viewers;
@@ -54,9 +89,42 @@ export default function ViewersScreen() {
         {
           text: "Remove",
           style: "destructive",
-          onPress: () => {
-            // TODO: Call API to remove viewer
-            Alert.alert("Success", "Viewer removed successfully");
+          onPress: async () => {
+            try {
+              const tripIdNum = Number(Array.isArray(id) ? id[0] : id);
+              if (!tripIdNum || isNaN(tripIdNum)) {
+                throw new Error("Invalid trip ID");
+              }
+              
+              await removeViewerFromTrip(tripIdNum, userId);
+              
+              // Reload trip data
+              const tripData = await getTripById(tripIdNum);
+              const currentUserId = auth.currentUser?.uid || null;
+              const isCollaborator = tripData.collaborators?.includes(currentUserId) || false;
+              const isOwner = tripData.ownerId === currentUserId;
+              
+              const viewers = tripData.viewers?.map((firebaseId) => ({
+                id: firebaseId,
+                username: firebaseId,
+                displayName: firebaseId,
+              })) || [];
+              
+              setTrip({
+                ...tripData,
+                id: String(tripData.tripId),
+                tripId: tripData.tripId,
+                isCollaborator: isCollaborator || isOwner,
+                ownerId: tripData.ownerId,
+                currentUserId,
+                viewers,
+              });
+              
+              Alert.alert("Success", "Viewer removed successfully");
+            } catch (error) {
+              console.error("Failed to remove viewer:", error);
+              Alert.alert("Error", error?.message || "Failed to remove viewer");
+            }
           },
         },
       ]

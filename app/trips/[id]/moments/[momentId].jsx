@@ -7,7 +7,9 @@ import TText from "../../../../src/components/TText";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { spacing } from "../../../../src/theme/spacing";
 import { useTheme } from "../../../../src/theme";
-import { fetchTripById } from "../../../../src/data/trips";
+import { getTripById } from "../../../../src/services/tripApi";
+import { getMediaFileUrl } from "../../../../src/services/fileStorageApi";
+import { auth } from "../../../../src/services/firebase";
 import SafeBottomBar from "../../../../src/components/SafeBottomBar";
 
 export default function MomentScreen() {
@@ -21,10 +23,89 @@ export default function MomentScreen() {
   useEffect(() => {
     let on = true;
     (async () => {
-      const t = await fetchTripById(String(id || "t1"));
-      if (!on) return;
-      setTrip(t);
-      setLoading(false);
+      try {
+        setLoading(true);
+        const tripIdNum = Number(Array.isArray(id) ? id[0] : id);
+        if (!tripIdNum || isNaN(tripIdNum)) {
+          console.error("Invalid trip ID:", id);
+          return;
+        }
+        
+        const tripData = await getTripById(tripIdNum);
+        if (!on) return;
+        
+        // Transform API response to UI format (same as index.jsx)
+        const currentUserId = auth.currentUser?.uid || null;
+        const isCollaborator = tripData.collaborators?.includes(currentUserId) || false;
+        const isOwner = tripData.ownerId === currentUserId;
+        
+        // Flatten media from all albums
+        const allMedia = [];
+        const moments = [];
+        
+        tripData.albums?.forEach((album) => {
+          // Skip default album for moments list
+          if (album.albumId === tripData.defaultAlbum) {
+            // Add media from default album to allMedia
+            album.media?.forEach((m) => {
+              allMedia.push({
+                id: String(m.mediaId),
+                uri: getMediaFileUrl(m.pathUrl),
+                uploader: m.uploader,
+                createdAt: m.createdAt ? new Date(m.createdAt).getTime() : Date.now(),
+              });
+            });
+          } else {
+            // Create moment from album
+            const albumMedia = album.media || [];
+            const coverMedia = albumMedia[0];
+            moments.push({
+              id: String(album.albumId),
+              title: album.title || "Untitled Moment",
+              description: album.description || "",
+              coverUri: coverMedia ? getMediaFileUrl(coverMedia.pathUrl) : null,
+              mediaIds: albumMedia.map((m) => String(m.mediaId)),
+              createdBy: coverMedia?.uploader || tripData.ownerId,
+              createdAt: album.createdAt ? new Date(album.createdAt).getTime() : Date.now(),
+            });
+            
+            // Add media from this album
+            albumMedia.forEach((m) => {
+              allMedia.push({
+                id: String(m.mediaId),
+                uri: getMediaFileUrl(m.pathUrl),
+                uploader: m.uploader,
+                createdAt: m.createdAt ? new Date(m.createdAt).getTime() : Date.now(),
+              });
+            });
+          }
+        });
+        
+        const transformedTrip = {
+          id: String(tripData.tripId),
+          tripId: tripData.tripId,
+          title: tripData.title || "",
+          description: tripData.description || "",
+          coverUri: tripData.coverPhotoUrl || null,
+          visibility: tripData.visibility || "PRIVATE",
+          ownerId: tripData.ownerId,
+          currentUserId,
+          isCollaborator: isCollaborator || isOwner,
+          isViewer: !isCollaborator && !isOwner,
+          media: allMedia,
+          moments,
+          stats: {
+            moments: moments.length,
+            media: allMedia.length,
+          },
+        };
+        
+        setTrip(transformedTrip);
+      } catch (error) {
+        console.error("Failed to load trip:", error);
+      } finally {
+        if (on) setLoading(false);
+      }
     })();
     return () => { on = false; };
   }, [id]);
