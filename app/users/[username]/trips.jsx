@@ -11,6 +11,7 @@ import { fetchTrips, fetchUserByUsername, fetchMe } from "../../../src/data/api"
 import SkeletonRect from "../../../src/components/skeleton/SkeletonRect";
 import SkeletonText from "../../../src/components/skeleton/SkeletonText";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { getMediaFileUrl } from "../../../src/services/fileStorageApi";
 
 export default function UserTripsList() {
   const { username } = useLocalSearchParams();
@@ -60,7 +61,7 @@ export default function UserTripsList() {
                 <Pressable>
                   <Card style={{ padding: 0 }}>
                     <Image 
-                      source={t.coverPhotoUrl ? { uri: t.coverPhotoUrl } : require("../../../assets/cover-default.jpg")} 
+                      source={t.coverPhotoUrl ? { uri: getMediaFileUrl(t.coverPhotoUrl) } : require("../../../assets/cover-default.jpg")} 
                       style={{ width: "100%", height: 140 }} 
                     />
                     <View style={{ padding: spacing.lg }}>

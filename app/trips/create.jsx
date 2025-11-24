@@ -16,6 +16,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import * as ImagePicker from "expo-image-picker";
 import { createTrip } from "../../src/services/tripApi";
 import { auth } from "../../src/services/firebase";
+import { uploadMediaFile } from "../../src/services/fileStorageApi";
 import * as Clipboard from "expo-clipboard";
 
 export default function CreateTripScreen() {
@@ -84,14 +85,40 @@ export default function CreateTripScreen() {
         return;
       }
 
-      // TODO: Upload cover photo to file storage service
-      // For now, we'll create the trip without cover photo URL
+      // Upload cover photo if selected
+      let coverPhotoUrl = null;
+      if (coverPhoto) {
+        try {
+          const fileObj = {
+            uri: coverPhoto.uri,
+            type: coverPhoto.mimeType || coverPhoto.type || "image/jpeg",
+            name: coverPhoto.fileName || coverPhoto.filename || `cover_${Date.now()}.jpg`,
+          };
+          
+          const uploadResult = await uploadMediaFile(fileObj);
+          coverPhotoUrl = uploadResult.fileID;
+        } catch (error) {
+          console.error("Failed to upload cover photo:", error);
+          Alert.alert(
+            "Upload Warning",
+            "Failed to upload cover photo. Trip will be created without cover photo.",
+            [
+              { text: "Continue", style: "default" },
+              { text: "Cancel", style: "cancel", onPress: () => setCreating(false) },
+            ]
+          );
+          if (error.message?.includes("cancel")) {
+            return;
+          }
+        }
+      }
+
       const tripDto = {
         title: tripName.trim(),
-        description: description.trim(),
+        description: description.trim() || null,
         visibility: visibility,
         ownerId: user.uid,
-        // coverPhotoUrl will be added later after file upload
+        coverPhotoUrl: coverPhotoUrl,
       };
 
       const newTrip = await createTrip(tripDto);

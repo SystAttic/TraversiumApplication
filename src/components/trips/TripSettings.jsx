@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { View, Image, ScrollView, Pressable, Alert } from "react-native";
+import { View, Image, ScrollView, Pressable, Alert, ActivityIndicator } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as ImagePicker from "expo-image-picker";
 import Card from "../Card";
@@ -13,14 +13,18 @@ import BottomSheet from "../BottomSheet";
 import UserRow from "../users/UserRow";
 import { router } from "expo-router";
 import { TRIP_BAR_BASE_HEIGHT } from "./TripBottomBar";
+import { uploadMediaFile } from "../../services/fileStorageApi";
+import { updateTrip, getTripById } from "../../services/tripApi";
+import { getMediaFileUrl } from "../../services/fileStorageApi";
 
-export default function TripSettings({ trip }) {
+export default function TripSettings({ trip, onTripUpdate }) {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
-  const canEdit = !!trip?.isCollaborator || trip?.ownerId === trip?.currentUserId;
+  const canEdit = trip?.isCollaborator || trip?.ownerId === trip?.currentUserId;
 
   // Cover photo state
   const [coverPhoto, setCoverPhoto] = useState(null);
+  const [uploadingCover, setUploadingCover] = useState(false);
 
   // Invite management
   const [showInviteSheet, setShowInviteSheet] = useState(false);
@@ -29,6 +33,11 @@ export default function TripSettings({ trip }) {
   const [inviteRole, setInviteRole] = useState(null); // "collaborator" | "viewer" | null
 
   const handlePickImage = async () => {
+    if (!canEdit) {
+      Alert.alert("Permission Denied", "You don't have permission to change the cover photo.");
+      return;
+    }
+
     const result = await ImagePicker.launchImageLibraryAsync({
       allowsEditing: true,
       aspect: [16, 9],
@@ -36,9 +45,65 @@ export default function TripSettings({ trip }) {
     });
 
     if (!result.canceled && result.assets?.[0]) {
-      setCoverPhoto(result.assets[0]);
-      // TODO: Upload to file storage and update trip cover photo
-      Alert.alert("Success", "Cover photo updated successfully");
+      const selectedPhoto = result.assets[0];
+      setCoverPhoto(selectedPhoto);
+      setUploadingCover(true);
+
+      try {
+        // Upload cover photo to file storage
+        const fileObj = {
+          uri: selectedPhoto.uri,
+          type: selectedPhoto.mimeType || selectedPhoto.type || "image/jpeg",
+          name: selectedPhoto.fileName || selectedPhoto.filename || `cover_${Date.now()}.jpg`,
+        };
+
+        const uploadResult = await uploadMediaFile(fileObj);
+        const coverPhotoUrl = uploadResult.fileID;
+
+        // Fetch the raw trip data to get the correct structure for update
+        const tripIdNum = Number(trip.tripId || trip.id);
+        if (!tripIdNum || isNaN(tripIdNum)) {
+          throw new Error("Invalid trip ID");
+        }
+
+        const rawTripData = await getTripById(tripIdNum);
+
+        // Update trip with new cover photo URL
+        const tripDto = {
+          tripId: rawTripData.tripId,
+          title: rawTripData.title || "",
+          description: rawTripData.description || null,
+          visibility: rawTripData.visibility || "PRIVATE",
+          ownerId: rawTripData.ownerId,
+          coverPhotoUrl: coverPhotoUrl, // Use the uploaded file ID
+          collaborators: rawTripData.collaborators || [],
+          viewers: rawTripData.viewers || [],
+          defaultAlbum: rawTripData.defaultAlbum || null,
+          albums: rawTripData.albums || [],
+        };
+
+        const updatedTrip = await updateTrip(tripDto);
+        
+        // Notify parent component to refresh trip data
+        if (onTripUpdate) {
+          onTripUpdate(updatedTrip);
+        }
+
+        // Update local state to reflect the new cover photo
+        setCoverPhoto({
+          ...selectedPhoto,
+          uri: getMediaFileUrl(coverPhotoUrl), // Use the uploaded file URL
+        });
+
+        Alert.alert("Success", "Cover photo updated successfully");
+      } catch (error) {
+        console.error("Failed to upload cover photo:", error);
+        Alert.alert("Error", error?.message || "Failed to upload cover photo. Please try again.");
+        // Reset cover photo on error
+        setCoverPhoto(null);
+      } finally {
+        setUploadingCover(false);
+      }
     }
   };
 
@@ -86,20 +151,31 @@ export default function TripSettings({ trip }) {
       >
         {/* Cover Photo */}
         <Card style={{ padding: 0, overflow: "hidden", marginBottom: spacing.lg }}>
-          <Image 
-            source={coverPhoto ? { uri: coverPhoto.uri } : { uri: trip?.coverUri }} 
-            style={{ width: "100%", height: 160, backgroundColor: colors.bg.layer3 }}
-            resizeMode="cover"
-          />
+          {(coverPhoto || trip?.coverPhotoUrl || trip?.coverUri) && (
+            <Image 
+              source={
+                coverPhoto 
+                  ? { uri: coverPhoto.uri } 
+                  : trip?.coverPhotoUrl 
+                    ? { uri: getMediaFileUrl(trip.coverPhotoUrl) }
+                    : trip?.coverUri 
+                      ? { uri: trip.coverUri }
+                      : null
+              } 
+              style={{ width: "100%", height: 160, backgroundColor: colors.bg.layer3 }}
+              resizeMode="cover"
+            />
+          )}
           <View style={{ padding: spacing.lg }}>
             <TText weight="bold" style={{ marginBottom: spacing.xs }}>Cover Photo</TText>
             <TText dim size="sm" style={{ marginBottom: spacing.md }}>
               Shown at the top of the trip.
             </TText>
             <Button 
-              title="Change cover photo" 
+              title={uploadingCover ? "Uploading..." : "Change cover photo"} 
               onPress={handlePickImage} 
-              disabled={!canEdit}
+              disabled={!canEdit || uploadingCover}
+              loading={uploadingCover}
             />
           </View>
         </Card>

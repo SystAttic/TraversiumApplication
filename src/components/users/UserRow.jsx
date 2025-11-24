@@ -6,6 +6,7 @@ import TText from "../TText";
 import Button from "../Button";
 import { spacing } from "../../theme/spacing";
 import { useTheme } from "../../theme";
+import { getMediaFileUrl } from "../../services/fileStorageApi";
 
 function UserRowBase({
   user,
@@ -22,8 +23,9 @@ function UserRowBase({
     <Card style={{ padding: spacing.md }}>
       <Pressable onPress={() => onPress?.(user)} style={{ flexDirection: "row", alignItems: "center" }}>
         <Image
-          source={avatar ? { uri: avatar } : require("../../../assets/profile-default.jpg")}
+          source={avatar ? { uri: getMediaFileUrl(avatar) } : require("../../../assets/profile-default.jpg")}
           style={{ width: 44, height: 44, borderRadius: 999, marginRight: spacing.md }}
+          resizeMode="cover"
         />
         <View style={{ flex: 1 }}>
           <TText weight="medium">{name}</TText>

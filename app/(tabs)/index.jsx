@@ -15,6 +15,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useTranslation } from "react-i18next";
+import { getMediaFileUrl } from "../../src/services/fileStorageApi";
 
 export default function HomeScreen() {
   const { colors } = useTheme();
@@ -250,7 +251,7 @@ export default function HomeScreen() {
                 <Card style={{ padding: 0, overflow: "hidden" }}>
                   <Image 
                     source={featuredTrip.coverPhotoUrl 
-                      ? { uri: featuredTrip.coverPhotoUrl } 
+                      ? { uri: getMediaFileUrl(featuredTrip.coverPhotoUrl) } 
                       : require("../../assets/cover-default.jpg")
                     } 
                     style={{ width: "100%", height: 200 }} 
@@ -344,7 +345,7 @@ export default function HomeScreen() {
                       >
                         <Image 
                           source={t.coverPhotoUrl 
-                            ? { uri: t.coverPhotoUrl } 
+                            ? { uri: getMediaFileUrl(t.coverPhotoUrl) } 
                             : require("../../assets/cover-default.jpg")
                           } 
                           style={{ width: "100%", height: 120 }} 

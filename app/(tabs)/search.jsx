@@ -6,7 +6,7 @@ import Card from "../../src/components/Card";
 import TText from "../../src/components/TText";
 import { useTheme } from "../../src/theme";
 import { spacing, radii } from "../../src/theme/spacing";
-import { Link } from "expo-router";
+import { Link, router } from "expo-router";
 import SkeletonRect from "../../src/components/skeleton/SkeletonRect";
 import SkeletonText from "../../src/components/skeleton/SkeletonText";
 import { fetchMe } from "../../src/data/api";
@@ -454,11 +454,14 @@ export default function SearchScreen() {
         {!loading && !refreshing && searchType === "users" && (
           <View style={{ gap: spacing.md }}>
             {results.map((user) => (
-              <Link key={user.username || user.userId} href={`/users/${encodeURIComponent(user.username)}`} asChild>
-                <Pressable>
-                  <UserRow user={user} rightKind="none" />
-                </Pressable>
-              </Link>
+              <UserRow 
+                key={user.username || user.userId} 
+                user={user} 
+                rightKind="none"
+                onPress={(user) => {
+                  router.push(`/users/${encodeURIComponent(user.username)}`);
+                }}
+              />
             ))}
           </View>
         )}

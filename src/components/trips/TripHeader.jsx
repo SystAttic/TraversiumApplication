@@ -4,6 +4,7 @@ import Card from "../Card";
 import TText from "../TText";
 import { spacing, radii } from "../../theme/spacing";
 import { useTheme } from "../../theme";
+import { getMediaFileUrl } from "../../services/fileStorageApi";
 
 export default function TripHeader({ trip }) {
   const { colors } = useTheme();
@@ -30,12 +31,19 @@ export default function TripHeader({ trip }) {
             {collabs.map((c, idx) => (
               <Image
                 key={c.id}
-                source={{ uri: c.avatar }}
+                source={{ 
+                  uri: c.avatarPhotoReference 
+                    ? getMediaFileUrl(c.avatarPhotoReference)
+                    : c.avatar 
+                    ? getMediaFileUrl(c.avatar)
+                    : require("../../../assets/profile-default.jpg")
+                }}
                 style={{
                   width: 28, height: 28, borderRadius: 999,
                   borderWidth: 2, borderColor: colors.bg.layer1,
                   marginLeft: idx === 0 ? 0 : -8,
                 }}
+                resizeMode="cover"
               />
             ))}
           </View>

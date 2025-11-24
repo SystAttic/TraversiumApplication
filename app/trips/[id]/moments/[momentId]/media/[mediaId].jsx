@@ -378,7 +378,11 @@ export default function MediaViewer() {
             <>
               <Image
                 source={{ 
-                  uri: uploaderInfo.avatar || uploaderInfo.avatarPhotoReference || "https://i.pravatar.cc/100?img=1"
+                  uri: uploaderInfo.avatarPhotoReference 
+                    ? getMediaFileUrl(uploaderInfo.avatarPhotoReference)
+                    : uploaderInfo.avatar 
+                    ? getMediaFileUrl(uploaderInfo.avatar)
+                    : "https://i.pravatar.cc/100?img=1"
                 }}
                 style={{ 
                   width: 32, 

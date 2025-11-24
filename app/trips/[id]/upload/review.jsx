@@ -15,7 +15,7 @@ import { getMediaFileUrl } from "../../../../src/services/fileStorageApi";
 import { LinearGradient } from "expo-linear-gradient";
 
 export default function ReviewScreen() {
-  const { id: tripId, assignments: assignmentsJson, originalOrder: originalOrderJson } = useLocalSearchParams();
+  const { id: tripId, assignments: assignmentsJson, originalOrder: originalOrderJson, reorderedAlbums: reorderedAlbumsJson } = useLocalSearchParams();
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
 
@@ -43,6 +43,15 @@ export default function ReviewScreen() {
     }
   }, [originalOrderJson]);
 
+  const reorderedAlbumsFromParams = useMemo(() => {
+    try {
+      const json = Array.isArray(reorderedAlbumsJson) ? reorderedAlbumsJson[0] : reorderedAlbumsJson;
+      return json ? JSON.parse(json) : null;
+    } catch {
+      return null;
+    }
+  }, [reorderedAlbumsJson]);
+
   const [loading, setLoading] = useState(true);
   const [trip, setTrip] = useState(null);
   const [defaultAlbum, setDefaultAlbum] = useState(null);
@@ -62,7 +71,22 @@ export default function ReviewScreen() {
         const defaultAlbumId = tripData.defaultAlbum;
         const allAlbums = tripData.albums || [];
         const defaultAlbumData = allAlbums.find((a) => a.albumId === defaultAlbumId);
-        const otherAlbums = allAlbums.filter((a) => a.albumId !== defaultAlbumId);
+        
+        // Use reordered albums from params if available, otherwise use from API
+        let otherAlbums;
+        if (reorderedAlbumsFromParams && reorderedAlbumsFromParams.length > 0) {
+          // Use the reordered albums passed from manual-arrange
+          // We need to ensure they have all the data (media, etc.) from the API
+          const albumMap = new Map(allAlbums.map(a => [a.albumId, a]));
+          otherAlbums = reorderedAlbumsFromParams.map(reorderedAlbum => {
+            // Merge with full album data from API to ensure we have all fields
+            const fullAlbum = albumMap.get(reorderedAlbum.albumId);
+            return fullAlbum || reorderedAlbum;
+          });
+        } else {
+          // Fallback to API order if no reordered albums passed
+          otherAlbums = allAlbums.filter((a) => a.albumId !== defaultAlbumId);
+        }
 
         setTrip(tripData);
         setDefaultAlbum(defaultAlbumData);
@@ -77,7 +101,7 @@ export default function ReviewScreen() {
       }
     })();
     return () => { on = false; };
-  }, [tripIdNum]);
+  }, [tripIdNum, reorderedAlbumsFromParams]);
 
   // Group assignments by album for review
   const assignmentsByAlbum = useMemo(() => {
@@ -107,14 +131,29 @@ export default function ReviewScreen() {
       if (hasReordered) {
         try {
           // Update trip with reordered albums (including default album)
+          // Ensure we include all albums in the correct order: default album first, then reordered albums
           const reorderedAlbums = [defaultAlbum, ...albums].filter(Boolean);
+          
+          // Build the complete trip DTO with all required fields
           const updatedTripDto = {
-            ...trip,
-            albums: reorderedAlbums,
+            tripId: trip.tripId,
+            title: trip.title,
+            description: trip.description,
+            ownerId: trip.ownerId,
+            visibility: trip.visibility,
+            coverPhotoUrl: trip.coverPhotoUrl,
+            collaborators: trip.collaborators || [],
+            viewers: trip.viewers || [],
+            defaultAlbum: trip.defaultAlbum,
+            albums: reorderedAlbums, // Pass albums in the new order
           };
+          
+          console.log("Updating trip with reordered albums:", reorderedAlbums.map(a => ({ id: a.albumId, title: a.title })));
           await updateTrip(updatedTripDto);
+          console.log("Album order updated successfully");
         } catch (error) {
           console.error("Failed to update album order:", error);
+          Alert.alert("Warning", "Failed to update moment order. Media assignments will still be applied.");
           // Continue with media assignments even if reordering fails
         }
       }

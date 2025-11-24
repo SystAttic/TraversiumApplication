@@ -198,11 +198,14 @@ export default function ManualArrangeScreen() {
     const totalCount = unorganizedMedia.length;
 
     const navigateToReview = () => {
+      // Pass the current reordered albums to review screen
+      const currentAlbumOrder = albums.map(a => a.albumId);
       router.push({
         pathname: `/trips/${tripIdNum}/upload/review`,
         params: {
           assignments: JSON.stringify(assignments),
           originalOrder: JSON.stringify(originalAlbumOrder),
+          reorderedAlbums: JSON.stringify(albums), // Pass the reordered albums
         },
       });
     };

@@ -9,6 +9,7 @@ import SkeletonText from "../skeleton/SkeletonText";
 import { Link } from "expo-router";
 import { spacing } from "../../theme/spacing";
 import { useTheme } from "../../theme";
+import { getMediaFileUrl } from "../../services/fileStorageApi";
 
 /**
  * Shared profile content component used by both own profile and visitor profile
@@ -115,7 +116,7 @@ export default function ProfileContent({
                   <Pressable>
                     <Card style={{ padding: 0 }}>
                       <Image 
-                        source={t.coverPhotoUrl ? { uri: t.coverPhotoUrl } : require("../../../assets/cover-default.jpg")} 
+                        source={t.coverPhotoUrl ? { uri: getMediaFileUrl(t.coverPhotoUrl) } : require("../../../assets/cover-default.jpg")} 
                         style={{ width: "100%", height: 140 }} 
                       />
                       <View style={{ padding: spacing.lg }}>

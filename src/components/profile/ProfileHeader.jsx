@@ -6,6 +6,7 @@ import Card from "../Card";
 import Divider from "../Divider";
 import { spacing, radii } from "../../theme/spacing";
 import Ionicons from "@expo/vector-icons/Ionicons";
+import { getMediaFileUrl } from "../../services/fileStorageApi";
 
 function RowAction({ icon, label, onPress }) {
   const { colors } = useTheme();
@@ -49,8 +50,9 @@ export default function ProfileHeader({
       {/* Cover */}
       <View style={{ width: "100%", height: 160, backgroundColor: colors.bg.layer2 }}>
         <Image
-          source={cover ? { uri: cover } : require("../../../assets/cover-default.jpg")}
+          source={cover ? { uri: getMediaFileUrl(cover) } : require("../../../assets/cover-default.jpg")}
           style={{ width: "100%", height: "100%" }}
+          resizeMode="cover"
         />
       </View>
 
@@ -64,8 +66,9 @@ export default function ProfileHeader({
           }}
         >
           <Image
-            source={avatar ? { uri: avatar } : require("../../../assets/profile-default.jpg")}
+            source={avatar ? { uri: getMediaFileUrl(avatar) } : require("../../../assets/profile-default.jpg")}
             style={{ width: "100%", height: "100%" }}
+            resizeMode="cover"
           />
         </View>
       </View>

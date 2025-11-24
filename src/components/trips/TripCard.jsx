@@ -6,6 +6,7 @@ import Card from "../Card";
 import TText from "../TText";
 import { useTheme } from "../../theme";
 import { spacing } from "../../theme/spacing";
+import { getMediaFileUrl } from "../../services/fileStorageApi";
 
 export default function TripCard({ trip, onPress }) {
   const { colors } = useTheme();
@@ -22,7 +23,7 @@ export default function TripCard({ trip, onPress }) {
 
   // Use default cover if no cover photo
   const coverSource = coverPhotoUrl 
-    ? { uri: coverPhotoUrl }
+    ? { uri: getMediaFileUrl(coverPhotoUrl) }
     : require("../../../assets/cover-default.jpg");
 
   const cardContent = (

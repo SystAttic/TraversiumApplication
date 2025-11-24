@@ -110,7 +110,7 @@ export default function TripScreen() {
           tripId: tripData.tripId,
           title: tripData.title || "",
           description: tripData.description || "",
-          coverUri: tripData.coverPhotoUrl || null,
+          coverUri: tripData.coverPhotoUrl ? getMediaFileUrl(tripData.coverPhotoUrl) : null,
           visibility: tripData.visibility || "PRIVATE",
           ownerId: tripData.ownerId,
           currentUserId,
@@ -308,7 +308,20 @@ export default function TripScreen() {
           <TripMiniHeader trip={trip} />
           {active === "activity" && <TripActivity tripId={trip.id} enabled />}
           {active === "gallery"  && <GalleryMasonry media={trip.media} onOpen={() => {}} />}
-          {active === "settings" && <TripSettings trip={trip} />}
+          {active === "settings" && (
+            <TripSettings 
+              trip={trip} 
+              onTripUpdate={(updatedTrip) => {
+                // Refresh trip data when cover photo is updated
+                const transformedTrip = {
+                  ...trip,
+                  coverPhotoUrl: updatedTrip.coverPhotoUrl,
+                  coverUri: updatedTrip.coverPhotoUrl ? getMediaFileUrl(updatedTrip.coverPhotoUrl) : null,
+                };
+                setTrip(transformedTrip);
+              }}
+            />
+          )}
         </>
       )}
 
