@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { View, TextInput, Pressable, ActivityIndicator } from "react-native";
 import { Link, router } from "expo-router";
 import { useTheme } from "../../src/theme";
@@ -6,26 +6,41 @@ import { spacing } from "../../src/theme/spacing";
 import TText from "../../src/components/TText";
 import AuthBackground from "../../src/components/auth/AuthBackground";
 import AuthCard from "../../src/components/auth/AuthCard";
+import TenantSelector from "../../src/components/auth/TenantSelector";
 import { LinearGradient } from "expo-linear-gradient";
 import {
   auth,
-  signInWithEmailAndPassword,
+  signInWithEmailAndPasswordForTenant,
 } from "../../src/services/firebase";
 import { saveFirebaseSession } from "../../src/auth/firebaseSession";
+import { getTenantId, setTenantId } from "../../src/utils/tenantStorage";
 
 export default function LoginScreen() {
   const { colors } = useTheme();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [tenantId, setTenantIdState] = useState("public");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    // Load saved tenant ID on mount
+    getTenantId().then(setTenantIdState);
+  }, []);
+
+  const handleTenantChange = async (newTenantId) => {
+    setTenantIdState(newTenantId);
+    await setTenantId(newTenantId);
+  };
 
   const onLogin = async () => {
     setError("");
     if (!email || !password) { setError("Please enter email and password"); return; }
     try {
       setBusy(true);
-      const cred = await signInWithEmailAndPassword(auth, email.trim(), password);
+      // Save tenant ID before login
+      await setTenantId(tenantId);
+      const cred = await signInWithEmailAndPasswordForTenant(tenantId, email.trim(), password);
       await saveFirebaseSession(cred.user);
       router.replace("/");
     } catch (e) {
@@ -54,6 +69,11 @@ export default function LoginScreen() {
           {/* Middle content - Inputs centered */}
           <View style={{ flex: 1, justifyContent: "center", gap: spacing.md }}>
             {!!error && <TText style={{ color: colors.status.danger }} size="sm" textAlign="center">{error}</TText>}
+            
+            <TenantSelector
+              tenantId={tenantId}
+              onTenantChange={handleTenantChange}
+            />
             
             <TextInput
               placeholder="Email"

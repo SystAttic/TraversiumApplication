@@ -13,12 +13,14 @@ import { LinearGradient } from "expo-linear-gradient";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import {
   auth,
-  createUserWithEmailAndPassword,
+  createUserWithEmailAndPasswordForTenant,
   updateProfile,
   deleteUser,
 } from "../../src/services/firebase";
 import { checkUserExists, createUser } from "../../src/services/userApi";
 import { saveFirebaseSession } from "../../src/auth/firebaseSession";
+import TenantSelector from "../../src/components/auth/TenantSelector";
+import { getTenantId, setTenantId } from "../../src/utils/tenantStorage";
 import DatePickerSheet from "../../src/components/pickers/DatePickerSheet";
 import GenderPickerSheet from "../../src/components/pickers/GenderPickerSheet";
 import CountryPickerSheet from "../../src/components/pickers/CountryPickerSheet";
@@ -38,6 +40,12 @@ export default function RegisterScreen() {
 
   const [step, setStep] = useState(1);
   const total = 4;
+  const [tenantId, setTenantIdState] = useState("public");
+
+  React.useEffect(() => {
+    // Load saved tenant ID on mount
+    getTenantId().then(setTenantIdState);
+  }, []);
 
   // Step 1
   const [email, setEmail] = useState("");
@@ -199,6 +207,11 @@ export default function RegisterScreen() {
   };
   const onBack = () => setStep(Math.max(1, step - 1));
 
+  const handleTenantChange = async (newTenantId) => {
+    setTenantIdState(newTenantId);
+    await setTenantId(newTenantId);
+  };
+
   const onFinish = async () => {
     setError("");
     let firebaseUser = null;
@@ -206,8 +219,11 @@ export default function RegisterScreen() {
     try {
       setBusy(true);
 
+      // Save tenant ID before registration
+      await setTenantId(tenantId);
+
       // Step 1: Create user in Firebase
-      const cred = await createUserWithEmailAndPassword(auth, email.trim(), password);
+      const cred = await createUserWithEmailAndPasswordForTenant(tenantId, email.trim(), password);
       firebaseUser = cred.user;
 
       // Step 2: Optional: set Firebase displayName for quick UX
@@ -293,6 +309,12 @@ export default function RegisterScreen() {
                   {!!error && <TText style={{ color: colors.status.danger }} size="sm">{error}</TText>}
 
                   <View style={{ gap: spacing.md, marginTop: spacing.md }}>
+                    {/* Tenant Selector */}
+                    <TenantSelector
+                      tenantId={tenantId}
+                      onTenantChange={handleTenantChange}
+                    />
+                    
                     {/* Email Input */}
                     <View>
                       <View style={{ flexDirection: "row", alignItems: "center", position: "relative" }}>

@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { View, Image, Pressable } from "react-native";
 import { Link } from "expo-router";
 import { useTheme } from "../../src/theme";
@@ -6,13 +6,26 @@ import { spacing } from "../../src/theme/spacing";
 import TText from "../../src/components/TText";
 import AuthBackground from "../../src/components/auth/AuthBackground";
 import AuthCard from "../../src/components/auth/AuthCard";
+import TenantSelector from "../../src/components/auth/TenantSelector";
 import { LinearGradient } from "expo-linear-gradient";
 import Ionicons from "@expo/vector-icons/Ionicons";
+import { getTenantId, setTenantId } from "../../src/utils/tenantStorage";
 
 export default function WelcomeScreen() {
 	const { colors, isDark } = useTheme();
+	const [tenantId, setTenantIdState] = useState("public");
 	const lightIcon = require("../../assets/adaptive-icon.png");
 	const darkIcon = require("../../assets/adaptive-icon-dark.png");
+
+	useEffect(() => {
+		// Load saved tenant ID on mount
+		getTenantId().then(setTenantIdState);
+	}, []);
+
+	const handleTenantChange = async (newTenantId) => {
+		setTenantIdState(newTenantId);
+		await setTenantId(newTenantId);
+	};
 	return (
 		<AuthBackground source={require("../../assets/auth_header.jpg")}>
 			<View style={{ alignItems: "center", marginTop: 54 }}>
@@ -29,6 +42,14 @@ export default function WelcomeScreen() {
 						<TText dim style={{ marginTop: spacing.md, textAlign: "center" }}>
 							It takes only one app to have perfectly organized and stored photos.
 						</TText>
+					</View>
+
+					{/* Tenant Selector */}
+					<View style={{ marginTop: spacing.md }}>
+						<TenantSelector
+							tenantId={tenantId}
+							onTenantChange={handleTenantChange}
+						/>
 					</View>
 
 					{/* Bottom CTA block */}
