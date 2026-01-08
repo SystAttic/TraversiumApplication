@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo, useCallback } from "react";
-import { ScrollView, View, Image, Pressable, RefreshControl } from "react-native";
+import { ScrollView, View, Pressable, RefreshControl } from "react-native";
 import Screen from "../../src/components/Screen";
 import AppHeader from "../../src/components/AppHeader";
 import Card from "../../src/components/Card";
@@ -16,6 +16,7 @@ import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useTranslation } from "react-i18next";
 import { getMediaFileUrl } from "../../src/services/fileStorageApi";
+import AuthenticatedImage from "../../src/components/AuthenticatedImage";
 
 export default function HomeScreen() {
   const { colors } = useTheme();
@@ -249,7 +250,7 @@ export default function HomeScreen() {
             <Link key={featuredTrip.tripId} href={`/trips/${featuredTrip.tripId}`} asChild>
               <Pressable>
                 <Card style={{ padding: 0, overflow: "hidden" }}>
-                  <Image 
+                  <AuthenticatedImage 
                     source={featuredTrip.coverPhotoUrl 
                       ? { uri: getMediaFileUrl(featuredTrip.coverPhotoUrl) } 
                       : require("../../assets/cover-default.jpg")
@@ -343,7 +344,7 @@ export default function HomeScreen() {
                           overflow: "hidden",
                         }}
                       >
-                        <Image 
+                        <AuthenticatedImage 
                           source={t.coverPhotoUrl 
                             ? { uri: getMediaFileUrl(t.coverPhotoUrl) } 
                             : require("../../assets/cover-default.jpg")

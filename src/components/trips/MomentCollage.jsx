@@ -1,7 +1,8 @@
 import React, { useMemo } from "react";
-import { View, Image, Pressable } from "react-native";
+import { View, Pressable } from "react-native";
 import { spacing } from "../../theme/spacing";
 import { useTheme } from "../../theme";
+import AuthenticatedImage from "../AuthenticatedImage";
 
 // A simple collage: first hero wide, next row 2-up, then 3 mosaic, repeat.
 // Falls back gracefully with 1-2 items.
@@ -38,7 +39,7 @@ export default function MomentCollage({ media = [], onOpen }) {
 
   const Hero = ({ m }) => (
     <Pressable onPress={() => onOpen?.(m)} style={{ marginBottom: 8 }}>
-      <Image
+      <AuthenticatedImage
         source={{ uri: m.uri }}
         style={{
           width: "100%",
@@ -46,6 +47,7 @@ export default function MomentCollage({ media = [], onOpen }) {
           borderRadius: 12,
           backgroundColor: colors.bg.layer3,
         }}
+        resizeMode="cover"
       />
     </Pressable>
   );
@@ -54,7 +56,7 @@ export default function MomentCollage({ media = [], onOpen }) {
     <View style={{ flexDirection: "row", gap: 8, marginBottom: 8 }}>
       {[a, b].filter(Boolean).map((m) => (
         <Pressable key={m.id} onPress={() => onOpen?.(m)} style={{ flex: 1 }}>
-          <Image
+          <AuthenticatedImage
             source={{ uri: m.uri }}
             style={{
               width: "100%",
@@ -62,6 +64,7 @@ export default function MomentCollage({ media = [], onOpen }) {
               borderRadius: 12,
               backgroundColor: colors.bg.layer3,
             }}
+            resizeMode="cover"
           />
         </Pressable>
       ))}
@@ -73,7 +76,7 @@ export default function MomentCollage({ media = [], onOpen }) {
       {/* Left tall (a), right stacked (b,c) */}
       {!!a && (
         <Pressable onPress={() => onOpen?.(a)} style={{ flex: 1 }}>
-          <Image
+          <AuthenticatedImage
             source={{ uri: a.uri }}
             style={{
               width: "100%",
@@ -81,13 +84,14 @@ export default function MomentCollage({ media = [], onOpen }) {
               borderRadius: 12,
               backgroundColor: colors.bg.layer3,
             }}
+            resizeMode="cover"
           />
         </Pressable>
       )}
       <View style={{ flex: 1, gap: 8 }}>
         {[b, c].filter(Boolean).map((m) => (
           <Pressable key={m.id} onPress={() => onOpen?.(m)} style={{ flex: 1 }}>
-            <Image
+            <AuthenticatedImage
               source={{ uri: m.uri }}
               style={{
                 width: "100%",
@@ -95,6 +99,7 @@ export default function MomentCollage({ media = [], onOpen }) {
                 borderRadius: 12,
                 backgroundColor: colors.bg.layer3,
               }}
+              resizeMode="cover"
             />
           </Pressable>
         ))}
@@ -104,7 +109,7 @@ export default function MomentCollage({ media = [], onOpen }) {
 
   const Single = ({ m }) => (
     <Pressable onPress={() => onOpen?.(m)} style={{ marginBottom: 8 }}>
-      <Image
+      <AuthenticatedImage
         source={{ uri: m.uri }}
         style={{
           width: "100%",
@@ -112,6 +117,7 @@ export default function MomentCollage({ media = [], onOpen }) {
           borderRadius: 12,
           backgroundColor: colors.bg.layer3,
         }}
+        resizeMode="cover"
       />
     </Pressable>
   );

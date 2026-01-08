@@ -1,11 +1,12 @@
 import React from "react";
-import { View, ImageBackground, Pressable } from "react-native";
+import { View, Pressable } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "../../theme";
 import { spacing, radii } from "../../theme/spacing";
 import TText from "../TText";
 import { router } from "expo-router";
+import AuthenticatedImageBackground from "../AuthenticatedImageBackground";
 
 export default function TripMiniHeader({ trip }) {
   const { colors } = useTheme();
@@ -24,7 +25,7 @@ export default function TripMiniHeader({ trip }) {
         }}
       >
         {/* inner blurred-looking band using cover as bg */}
-        <ImageBackground
+        <AuthenticatedImageBackground
           source={{ uri: trip?.coverUri }}
           imageStyle={{ opacity: 0.28 }} // soft overlay feel
           style={{
@@ -56,7 +57,7 @@ export default function TripMiniHeader({ trip }) {
 
           {/* spacer to balance back button layout */}
           <View style={{ width: 34, height: 34 }} />
-        </ImageBackground>
+        </AuthenticatedImageBackground>
       </View>
     </View>
   );

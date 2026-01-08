@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Image, Pressable } from "react-native";
+import { View, Pressable } from "react-native";
 import { Link } from "expo-router";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import Card from "../Card";
@@ -7,6 +7,7 @@ import TText from "../TText";
 import { useTheme } from "../../theme";
 import { spacing } from "../../theme/spacing";
 import { getMediaFileUrl } from "../../services/fileStorageApi";
+import AuthenticatedImage from "../AuthenticatedImage";
 
 export default function TripCard({ trip, onPress }) {
   const { colors } = useTheme();
@@ -28,7 +29,7 @@ export default function TripCard({ trip, onPress }) {
 
   const cardContent = (
     <Card style={{ padding: 0 }}>
-      <Image
+      <AuthenticatedImage
         source={coverSource}
         style={{ width: "100%", height: 100 }}
         resizeMode="cover"

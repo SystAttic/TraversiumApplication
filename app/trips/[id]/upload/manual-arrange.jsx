@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { View, ScrollView, Pressable, Image, ActivityIndicator, Alert, FlatList, TextInput } from "react-native";
+import { View, ScrollView, Pressable, ActivityIndicator, Alert, FlatList, TextInput } from "react-native";
 import { useLocalSearchParams, router } from "expo-router";
 import Screen from "../../../../src/components/Screen";
 import AppHeader from "../../../../src/components/AppHeader";
@@ -16,6 +16,7 @@ import { getMediaFileUrl } from "../../../../src/services/fileStorageApi";
 import BottomSheet from "../../../../src/components/BottomSheet";
 import Input from "../../../../src/components/Input";
 import { LinearGradient } from "expo-linear-gradient";
+import AuthenticatedImage from "../../../../src/components/AuthenticatedImage";
 
 export default function ManualArrangeScreen() {
   const { id: tripId, uploadedFileIds: uploadedFileIdsJson } = useLocalSearchParams();
@@ -78,13 +79,14 @@ export default function ManualArrangeScreen() {
         
         let filteredMedia = uploadedFileIds && uploadedFileIds.length > 0
           ? allMedia.filter(media => {
+              if (!media.pathUrl) return false; // Skip media without pathUrl
               const matches = uploadedFileIds.includes(media.pathUrl);
               if (!matches && allMedia.length > 0) {
                 console.log("Media pathUrl doesn't match:", media.pathUrl, "vs uploaded IDs:", uploadedFileIds);
               }
               return matches;
             })
-          : allMedia;
+          : allMedia.filter(media => media.pathUrl); // Filter out media without pathUrl
         
         // Fallback: if filtering resulted in 0 items but we have uploadedFileIds,
         // show all media from default album (might be a timing issue or mismatch)
@@ -321,7 +323,7 @@ export default function ManualArrangeScreen() {
     );
   }
 
-  const mediaUrl = getMediaFileUrl(currentMedia.pathUrl);
+  const mediaUrl = currentMedia.pathUrl ? getMediaFileUrl(currentMedia.pathUrl) : null;
   const assignedAlbum = currentAssignment ? albums.find((a) => a.albumId === currentAssignment) : null;
 
   return (
@@ -347,11 +349,18 @@ export default function ManualArrangeScreen() {
           }}
         >
           <View style={{ flex: 1, position: "relative" }}>
-            <Image
-              source={{ uri: mediaUrl }}
-              style={{ width: "100%", height: "100%" }}
-              resizeMode="contain"
-            />
+            {mediaUrl ? (
+              <AuthenticatedImage
+                source={{ uri: mediaUrl }}
+                style={{ width: "100%", height: "100%" }}
+                resizeMode="contain"
+              />
+            ) : (
+              <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.bg.layer3 }}>
+                <Ionicons name="image-outline" size={48} color={colors.text.muted} />
+                <TText dim style={{ marginTop: spacing.sm }}>No image available</TText>
+              </View>
+            )}
 
             {/* Navigation Arrows */}
             {unorganizedMedia.length > 1 && (

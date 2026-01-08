@@ -1,6 +1,6 @@
 // app/trips/[id]/index.jsx
 import React, { useEffect, useState, useRef } from "react";
-import { View, ActivityIndicator, Animated, ImageBackground, Pressable } from "react-native";
+import { View, ActivityIndicator, Animated, Pressable } from "react-native";
 import TripMiniHeader from "../../../src/components/trips/TripMiniHeader";
 import TripActivity from "../../../src/components/trips/TripActivity";
 import GalleryMasonry from "../../../src/components/trips/GalleryMasonry";
@@ -10,13 +10,15 @@ import { useLocalSearchParams } from "expo-router";
 import { getTripById } from "../../../src/services/tripApi";
 import { getMediaFileUrl } from "../../../src/services/fileStorageApi";
 import { auth } from "../../../src/services/firebase";
-import { spacing } from "../../../src/theme/spacing";
+import AuthenticatedImageBackground from "../../../src/components/AuthenticatedImageBackground";
+import { spacing, radii } from "../../../src/theme/spacing";
 import TText from "../../../src/components/TText";
 import { useTheme } from "../../../src/theme";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { router } from "expo-router";
 import MomentCard from "../../../src/components/trips/MomentCard";
+import UnorganizedMediaBanner from "../../../src/components/trips/UnorganizedMediaBanner";
 
 const COVER_H = 260; // big header height
 
@@ -53,12 +55,17 @@ export default function TripScreen() {
         // Flatten media from all albums
         const allMedia = [];
         const moments = [];
+        let unorganizedMediaCount = 0;
         
         tripData.albums?.forEach((album) => {
           // Skip default album for moments list
           if (album.albumId === tripData.defaultAlbum) {
+            // Count unorganized media (media in default album)
+            const defaultAlbumMedia = album.media?.filter(m => m.pathUrl) || [];
+            unorganizedMediaCount = defaultAlbumMedia.length;
+            
             // Add media from default album to allMedia
-            album.media?.forEach((m) => {
+            defaultAlbumMedia.forEach((m) => {
               allMedia.push({
                 id: String(m.mediaId),
                 uri: getMediaFileUrl(m.pathUrl),
@@ -82,6 +89,7 @@ export default function TripScreen() {
             
             // Add media from this album
             albumMedia.forEach((m) => {
+              if (!m.pathUrl) return; // Skip media without pathUrl
               allMedia.push({
                 id: String(m.mediaId),
                 uri: getMediaFileUrl(m.pathUrl),
@@ -120,6 +128,7 @@ export default function TripScreen() {
           viewers,
           media: allMedia,
           moments,
+          unorganizedMediaCount,
           stats: {
             moments: moments.length,
             media: allMedia.length,
@@ -175,7 +184,7 @@ export default function TripScreen() {
               transform: [{ translateY: coverTranslateY }],
             }}
           >
-            <ImageBackground
+            <AuthenticatedImageBackground
               source={{ uri: trip.coverUri }}
               style={{ flex: 1 }}
               imageStyle={{ opacity: 0.95 }}
@@ -211,7 +220,7 @@ export default function TripScreen() {
                   {trip.title || "Trip"}
                 </TText>
               </View>
-            </ImageBackground>
+            </AuthenticatedImageBackground>
           </Animated.View>
 
           {/* Mini header pinned (full width, flush top), only visible after cover */}
@@ -287,6 +296,15 @@ export default function TripScreen() {
                     </View>
                   )}
                 </View>
+
+                {/* Unorganized Media Banner */}
+                <UnorganizedMediaBanner
+                  count={trip.unorganizedMediaCount}
+                  onSortPress={() => {
+                    const tripId = Array.isArray(id) ? id[0] : id;
+                    router.push(`/trips/${tripId}/upload/arrange-selection`);
+                  }}
+                />
               </View>
             }
             renderItem={({ item }) => (

@@ -1,8 +1,9 @@
 import React, { useMemo } from "react";
-import { View, Image, Pressable, FlatList } from "react-native";
+import { View, Pressable, FlatList } from "react-native";
 import { spacing } from "../../theme/spacing";
 import { useTheme } from "../../theme";
 import TText from "../TText";
+import AuthenticatedImage from "../AuthenticatedImage";
 
 export default function GalleryMasonry({ media = [], onOpen }) {
   const { colors } = useTheme();
@@ -26,7 +27,7 @@ export default function GalleryMasonry({ media = [], onOpen }) {
         const height = Math.max(100, Math.min(220, 160 * ratio));
         return (
           <Pressable key={m.id} onPress={() => onOpen?.(m)}>
-            <Image
+            <AuthenticatedImage
               source={{ uri: m.uri }}
               style={{
                 width: "100%",
@@ -34,6 +35,7 @@ export default function GalleryMasonry({ media = [], onOpen }) {
                 borderRadius: 12,
                 backgroundColor: colors.bg.layer3,
               }}
+              resizeMode="cover"
             />
           </Pressable>
         );

@@ -1,5 +1,5 @@
 import React from "react";
-import { View, ImageBackground, Pressable, Animated } from "react-native";
+import { View, Pressable, Animated } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "../../theme";
@@ -7,6 +7,7 @@ import { spacing, radii } from "../../theme/spacing";
 import TText from "../TText";
 import * as Clipboard from "expo-clipboard";
 import { router } from "expo-router";
+import AuthenticatedImageBackground from "../AuthenticatedImageBackground";
 
 const HEADER_MAX = 240;   // big cover
 const HEADER_MIN = 64;    // collapsed height (like a top bar)
@@ -39,7 +40,7 @@ export default function TripCollapsibleHeader({ trip, scrollY }) {
 
   return (
     <Animated.View style={{ height: headerH, overflow: "hidden" }}>
-      <ImageBackground
+      <AuthenticatedImageBackground
         source={{ uri: trip?.coverUri }}
         style={{ flex: 1, backgroundColor: colors.bg.layer3 }}
         imageStyle={{ opacity: 0.95 }}
@@ -109,7 +110,7 @@ export default function TripCollapsibleHeader({ trip, scrollY }) {
             opacity: dim,
           }}
         />
-      </ImageBackground>
+      </AuthenticatedImageBackground>
     </Animated.View>
   );
 }

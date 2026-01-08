@@ -102,46 +102,280 @@ export async function fetchTripById(id, { me = "u1" } = {}) {
   return { ...trip, isCollaborator, isViewer };
 }
 
-export async function fetchTripActivity(id, { page = 0, pageSize = 20 } = {}) {
-  await new Promise(r => setTimeout(r, 180));
-  
-  const activityTypes = [
-    "UPLOAD", "ARRANGE", "DELETE_MEDIA", "DELETE_MOMENT", 
-    "CHANGE_TRIP_INFO", "INVITED_PERSON", "NEW_COLLABORATOR", "NEW_VIEWER"
-  ];
-  
-  const activityTexts = {
-    "UPLOAD": ["uploaded 12 photos", "uploaded 5 videos", "uploaded 3 images"],
-    "ARRANGE": ["rearranged moments", "organized media", "sorted moments"],
-    "DELETE_MEDIA": ["deleted photo", "removed media", "deleted image"],
-    "DELETE_MOMENT": ["deleted moment \"Café Morning\"", "removed moment \"Draft: Lunch\"", "deleted moment"],
-    "CHANGE_TRIP_INFO": ["changed trip title", "updated description", "modified trip settings"],
-    "INVITED_PERSON": ["invited @friend to collaborate", "sent invitation to user", "invited new member"],
-    "NEW_COLLABORATOR": ["added new collaborator", "granted edit access", "promoted to collaborator"],
-    "NEW_VIEWER": ["added viewer", "granted view access", "added new viewer"],
-  };
+import { getTripActivities } from "../services/auditApi";
+import { getUserById } from "../services/userApi";
+import { getMediaFileUrl } from "../services/fileStorageApi";
 
-  const events = Array.from({ length: pageSize }, (_, i) => {
-    const typeIndex = i % activityTypes.length;
-    const type = activityTypes[typeIndex];
-    const textOptions = activityTexts[type];
-    const textIndex = Math.floor(i / activityTypes.length) % textOptions.length;
-    const userIndex = i % users.length;
-    const user = users[userIndex];
+/**
+ * Maps backend action to frontend activity type
+ */
+function mapActionToType(action) {
+  const actionUpper = action.toUpperCase();
+  
+  // Media actions
+  if (actionUpper === "MEDIA_UPLOADED" || actionUpper === "MEDIA_ASSIGNED_TO_ALBUM") {
+    return "UPLOAD";
+  }
+  if (actionUpper === "MEDIA_DELETED" || actionUpper === "MEDIA_UNASSIGNED_FROM_ALBUM") {
+    return "DELETE_MEDIA";
+  }
+  
+  // Album/Moment actions (albums are moments in the frontend)
+  if (actionUpper === "ALBUM_CREATED") {
+    return "ARRANGE"; // Creating a moment/album is like arranging
+  }
+  if (actionUpper === "ALBUM_DELETED") {
+    return "DELETE_MOMENT";
+  }
+  if (actionUpper === "ALBUMS_REORDERED" || actionUpper === "ALBUM_INFO_CHANGED") {
+    return "ARRANGE";
+  }
+  
+  // Trip info changes
+  if (actionUpper.includes("TRIP_") && (actionUpper.includes("CHANGED") || actionUpper.includes("INFO"))) {
+    return "CHANGE_TRIP_INFO";
+  }
+  
+  // Collaborator actions
+  if (actionUpper === "TRIP_COLLABORATOR_INVITED") {
+    return "INVITED_PERSON";
+  }
+  if (actionUpper === "TRIP_COLLABORATOR_JOINED") {
+    return "NEW_COLLABORATOR";
+  }
+  if (actionUpper === "TRIP_COLLABORATOR_REMOVED") {
+    return "DELETE_MEDIA"; // Use delete icon for removal
+  }
+  
+  // Viewer actions
+  if (actionUpper === "TRIP_VIEWER_INVITED") {
+    return "INVITED_PERSON";
+  }
+  if (actionUpper === "TRIP_VIEWER_JOINED") {
+    return "NEW_VIEWER";
+  }
+  if (actionUpper === "TRIP_VIEWER_REMOVED") {
+    return "DELETE_MEDIA"; // Use delete icon for removal
+  }
+  
+  // Default fallback
+  return "UPLOAD";
+}
+
+/**
+ * Generates human-readable text from activity action and metadata
+ */
+function generateActivityText(action, metadata, entityType) {
+  const actionUpper = action.toUpperCase();
+  let metadataObj = null;
+  
+  try {
+    metadataObj = metadata ? JSON.parse(metadata) : null;
+  } catch (e) {
+    // Metadata might already be an object or invalid JSON
+    metadataObj = typeof metadata === "object" ? metadata : null;
+  }
+  
+  // Media actions
+  if (actionUpper === "MEDIA_UPLOADED") {
+    const count = metadataObj?.count || metadataObj?.mediaCount || 1;
+    const type = count === 1 ? "photo" : "photos";
+    return `uploaded ${count} ${type}`;
+  }
+  if (actionUpper === "MEDIA_DELETED") {
+    return "deleted media";
+  }
+  if (actionUpper === "MEDIA_ASSIGNED_TO_ALBUM") {
+    const albumTitle = metadataObj?.albumTitle || "moment";
+    return `added media to "${albumTitle}"`;
+  }
+  if (actionUpper === "MEDIA_UNASSIGNED_FROM_ALBUM") {
+    return "removed media from moment";
+  }
+  
+  // Album/Moment actions
+  if (actionUpper === "ALBUM_CREATED") {
+    const title = metadataObj?.title || metadataObj?.albumTitle || "moment";
+    return `created moment "${title}"`;
+  }
+  if (actionUpper === "ALBUM_DELETED") {
+    const title = metadataObj?.title || metadataObj?.albumTitle || "moment";
+    return `deleted moment "${title}"`;
+  }
+  if (actionUpper === "ALBUMS_REORDERED") {
+    return "rearranged moments";
+  }
+  if (actionUpper === "ALBUM_TITLE_CHANGED") {
+    const newTitle = metadataObj?.newTitle || metadataObj?.title;
+    return newTitle ? `renamed moment to "${newTitle}"` : "changed moment title";
+  }
+  if (actionUpper === "ALBUM_DESCRIPTION_CHANGED") {
+    return "updated moment description";
+  }
+  if (actionUpper === "ALBUM_INFO_CHANGED") {
+    return "updated moment";
+  }
+  
+  // Trip info changes
+  if (actionUpper === "TRIP_NAME_CHANGED" || actionUpper === "TRIP_TITLE_CHANGED") {
+    const newTitle = metadataObj?.newTitle || metadataObj?.title;
+    return newTitle ? `changed trip title to "${newTitle}"` : "changed trip title";
+  }
+  if (actionUpper === "TRIP_DESCRIPTION_CHANGED") {
+    return "updated trip description";
+  }
+  if (actionUpper === "TRIP_COVER_PHOTO_CHANGED") {
+    return "changed trip cover photo";
+  }
+  if (actionUpper === "TRIP_VISIBILITY_CHANGED") {
+    const visibility = metadataObj?.visibility || metadataObj?.newVisibility;
+    return visibility ? `changed trip visibility to ${visibility.toLowerCase()}` : "changed trip visibility";
+  }
+  if (actionUpper === "TRIP_INFO_CHANGED") {
+    return "updated trip info";
+  }
+  
+  // Collaborator actions
+  if (actionUpper === "TRIP_COLLABORATOR_INVITED") {
+    const username = metadataObj?.username || metadataObj?.collaboratorUsername;
+    return username ? `invited @${username} to collaborate` : "invited collaborator";
+  }
+  if (actionUpper === "TRIP_COLLABORATOR_JOINED") {
+    const username = metadataObj?.username || metadataObj?.collaboratorUsername;
+    return username ? `@${username} joined as collaborator` : "new collaborator joined";
+  }
+  if (actionUpper === "TRIP_COLLABORATOR_REMOVED") {
+    const username = metadataObj?.username || metadataObj?.collaboratorUsername;
+    return username ? `removed @${username} as collaborator` : "removed collaborator";
+  }
+  
+  // Viewer actions
+  if (actionUpper === "TRIP_VIEWER_INVITED") {
+    const username = metadataObj?.username || metadataObj?.viewerUsername;
+    return username ? `invited @${username} to view` : "invited viewer";
+  }
+  if (actionUpper === "TRIP_VIEWER_JOINED") {
+    const username = metadataObj?.username || metadataObj?.viewerUsername;
+    return username ? `@${username} joined as viewer` : "new viewer joined";
+  }
+  if (actionUpper === "TRIP_VIEWER_REMOVED") {
+    const username = metadataObj?.username || metadataObj?.viewerUsername;
+    return username ? `removed @${username} as viewer` : "removed viewer";
+  }
+  
+  // Trip lifecycle
+  if (actionUpper === "TRIP_CREATED") {
+    return "created trip";
+  }
+  if (actionUpper === "TRIP_DELETED") {
+    return "deleted trip";
+  }
+  
+  // Default fallback
+  return action.replace(/_/g, " ").toLowerCase();
+}
+
+/**
+ * Fetches user information by Firebase ID
+ * Returns a user object with fallback values if fetch fails
+ * Note: getUserById accepts Firebase ID since user ID and Firebase ID are the same
+ */
+async function fetchUserInfo(firebaseId) {
+  try {
+    const user = await getUserById(firebaseId);
+    return {
+      id: firebaseId,
+      username: user.username || firebaseId,
+      displayName: user.displayName || user.firstName || user.username || firebaseId,
+      avatar: user.avatarPhotoReference ? getMediaFileUrl(user.avatarPhotoReference) : null,
+    };
+  } catch (error) {
+    console.warn(`Failed to fetch user info for ${firebaseId}:`, error);
+    // Return fallback user object on error
+    return {
+      id: firebaseId,
+      username: firebaseId,
+      displayName: firebaseId,
+      avatar: null,
+    };
+  }
+}
+
+/**
+ * Fetches trip activity from AuditService
+ */
+export async function fetchTripActivity(id, { page = 0, pageSize = 20 } = {}) {
+  try {
+    const tripIdNum = Number(id);
+    if (!tripIdNum || isNaN(tripIdNum)) {
+      throw new Error(`Invalid trip ID: ${id}`);
+    }
+    
+    // Fetch activities from AuditService
+    const response = await getTripActivities(tripIdNum, { page, size: pageSize });
+    
+    // Fetch user info for all unique user IDs
+    const userIds = [...new Set(response.content.map(activity => activity.userId))];
+    const userMap = new Map();
+    
+    // Fetch user info in parallel (with error handling)
+    await Promise.all(
+      userIds.map(async (userId) => {
+        try {
+          const userInfo = await fetchUserInfo(userId);
+          userMap.set(userId, userInfo);
+        } catch (error) {
+          console.warn(`Failed to fetch user ${userId}:`, error);
+          userMap.set(userId, {
+            id: userId,
+            username: userId,
+            displayName: userId,
+            avatar: null,
+          });
+        }
+      })
+    );
+    
+    // Transform activities to frontend format
+    const items = response.content.map((activity) => {
+      const type = mapActionToType(activity.action);
+      const text = generateActivityText(activity.action, activity.metadata, activity.entityType);
+      const user = userMap.get(activity.userId) || {
+        id: activity.userId,
+        username: activity.userId,
+        displayName: activity.userId,
+        avatar: null,
+      };
+      
+      // Convert ISO timestamp to milliseconds
+      const time = activity.timestamp ? new Date(activity.timestamp).getTime() : Date.now();
+      
+      return {
+        id: String(activity.activityId || `activity-${activity.timestamp}-${activity.action}`),
+        type,
+        text,
+        time,
+        user,
+        // Include raw data for debugging/future use
+        raw: {
+          action: activity.action,
+          entityType: activity.entityType,
+          entityId: activity.entityId,
+          metadata: activity.metadata,
+        },
+      };
+    });
     
     return {
-      id: `a${page*pageSize+i+1}`,
-      type,
-      text: `${user.displayName} ${textOptions[textIndex]}`,
-      time: Date.now() - 1000 * 60 * (i + 1 + page*pageSize),
-      user: {
-        id: user.id,
-        username: user.username,
-        displayName: user.displayName,
-        avatar: user.avatar,
-      },
+      items,
+      hasMore: response.hasMore,
     };
-  });
-  
-  return { items: events, hasMore: page < 2 };
+  } catch (error) {
+    console.error("Failed to fetch trip activity:", error);
+    // Return empty result on error
+    return {
+      items: [],
+      hasMore: false,
+    };
+  }
 }

@@ -144,7 +144,7 @@ export default function UploadMediaScreen() {
 
           // Upload to file storage
           const uploadResult = await uploadMediaFile(fileObj);
-          fileId = uploadResult.fileID;
+          fileId = uploadResult.filename;
           uploadedFileIdsLocal.push(fileId);
           setUploadedFileIds([...uploadedFileIdsLocal]);
 

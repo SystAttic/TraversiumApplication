@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { View, Image, Pressable, ScrollView, TextInput, Alert, ActivityIndicator } from "react-native";
+import { View, Pressable, ScrollView, TextInput, Alert, ActivityIndicator } from "react-native";
 import Screen from "../../src/components/Screen";
 import AppHeader from "../../src/components/AppHeader";
 import Card from "../../src/components/Card";
@@ -15,6 +15,7 @@ import { fetchMe } from "../../src/data/api";
 import { updateUser } from "../../src/services/userApi";
 import { uploadMediaFile } from "../../src/services/fileStorageApi";
 import { getMediaFileUrl } from "../../src/services/fileStorageApi";
+import AuthenticatedImage from "../../src/components/AuthenticatedImage";
 
 export default function EditProfile() {
   const { colors } = useTheme();
@@ -124,7 +125,7 @@ export default function EditProfile() {
             name: avatar.fileName || avatar.filename || `avatar_${Date.now()}.jpg`,
           };
           const uploadResult = await uploadMediaFile(fileObj);
-          avatarPhotoReference = uploadResult.fileID;
+          avatarPhotoReference = uploadResult.filename;
         } catch (error) {
           console.error("Failed to upload avatar:", error);
           Alert.alert("Error", "Failed to upload avatar. Please try again.");
@@ -146,7 +147,7 @@ export default function EditProfile() {
             name: cover.fileName || cover.filename || `cover_${Date.now()}.jpg`,
           };
           const uploadResult = await uploadMediaFile(fileObj);
-          coverPhotoReference = uploadResult.fileID;
+          coverPhotoReference = uploadResult.filename;
         } catch (error) {
           console.error("Failed to upload cover:", error);
           Alert.alert("Error", "Failed to upload cover photo. Please try again.");
@@ -224,7 +225,7 @@ export default function EditProfile() {
                 <TText dim style={{ marginTop: spacing.sm }}>Uploading cover...</TText>
               </View>
             ) : (
-              <Image 
+              <AuthenticatedImage 
                 source={coverPreview 
                   ? { uri: coverPreview } 
                   : require("../../assets/cover-default.jpg")
@@ -249,7 +250,7 @@ export default function EditProfile() {
                   <ActivityIndicator size="small" color={colors.accent.primary} />
                 </View>
               ) : (
-                <Image
+                <AuthenticatedImage
                   source={avatarPreview 
                     ? { uri: avatarPreview } 
                     : require("../../assets/profile-default.jpg")

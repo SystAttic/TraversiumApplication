@@ -1,9 +1,10 @@
 import React from "react";
-import { View, Image, FlatList, Pressable } from "react-native";
+import { View, FlatList, Pressable } from "react-native";
 import Card from "../Card";
 import TText from "../TText";
 import { spacing } from "../../theme/spacing";
 import { useTheme } from "../../theme";
+import AuthenticatedImage from "../AuthenticatedImage";
 
 function MomentCard({ moment, mediaById = {}, onOpen }) {
   const { colors } = useTheme();
@@ -33,7 +34,7 @@ function MomentCard({ moment, mediaById = {}, onOpen }) {
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={{ gap: 8 }}
         renderItem={({ item }) => (
-          <Image
+          <AuthenticatedImage
             source={{ uri: item.uri }}
             style={{
               width: 120,

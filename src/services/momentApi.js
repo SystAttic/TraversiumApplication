@@ -44,13 +44,15 @@ export async function getMediaFromAlbum(albumId, mediaId) {
 /**
  * Add media to album
  * @param {number} albumId - Album ID
- * @param {Object} mediaDto - MediaDto object
+ * @param {Object|Object[]} mediaDto - MediaDto object or array of MediaDto objects
  * @returns {Promise<AlbumDto>}
  */
 export async function addMediaToAlbum(albumId, mediaDto) {
+  // Backend expects a list, so wrap single object in array if needed
+  const mediaDtos = Array.isArray(mediaDto) ? mediaDto : [mediaDto];
   return http(`/rest/v1/albums/${albumId}/media`, {
     method: "PUT",
-    body: JSON.stringify(mediaDto),
+    body: JSON.stringify(mediaDtos),
   }, TRIP_SERVICE_BASE);
 }
 

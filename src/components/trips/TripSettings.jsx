@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { View, Image, ScrollView, Pressable, Alert, ActivityIndicator } from "react-native";
+import { View, ScrollView, Pressable, Alert, ActivityIndicator } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as ImagePicker from "expo-image-picker";
 import Card from "../Card";
@@ -16,6 +16,7 @@ import { TRIP_BAR_BASE_HEIGHT } from "./TripBottomBar";
 import { uploadMediaFile } from "../../services/fileStorageApi";
 import { updateTrip, getTripById } from "../../services/tripApi";
 import { getMediaFileUrl } from "../../services/fileStorageApi";
+import AuthenticatedImage from "../AuthenticatedImage";
 
 export default function TripSettings({ trip, onTripUpdate }) {
   const { colors } = useTheme();
@@ -58,7 +59,7 @@ export default function TripSettings({ trip, onTripUpdate }) {
         };
 
         const uploadResult = await uploadMediaFile(fileObj);
-        const coverPhotoUrl = uploadResult.fileID;
+        const coverPhotoUrl = uploadResult.filename;
 
         // Fetch the raw trip data to get the correct structure for update
         const tripIdNum = Number(trip.tripId || trip.id);
@@ -152,7 +153,7 @@ export default function TripSettings({ trip, onTripUpdate }) {
         {/* Cover Photo */}
         <Card style={{ padding: 0, overflow: "hidden", marginBottom: spacing.lg }}>
           {(coverPhoto || trip?.coverPhotoUrl || trip?.coverUri) && (
-            <Image 
+            <AuthenticatedImage 
               source={
                 coverPhoto 
                   ? { uri: coverPhoto.uri } 

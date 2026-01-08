@@ -96,7 +96,7 @@ export default function CreateTripScreen() {
           };
           
           const uploadResult = await uploadMediaFile(fileObj);
-          coverPhotoUrl = uploadResult.fileID;
+          coverPhotoUrl = uploadResult.filename;
         } catch (error) {
           console.error("Failed to upload cover photo:", error);
           Alert.alert(

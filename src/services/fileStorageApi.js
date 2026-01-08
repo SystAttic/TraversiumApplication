@@ -27,7 +27,7 @@ async function getIdToken() {
  * @param {string} file.uri - Local file URI
  * @param {string} file.type - MIME type (e.g., "image/jpeg", "video/mp4")
  * @param {string} file.name - Original filename (optional)
- * @returns {Promise<{fileID: string}>} PostResponse with the unique filename
+ * @returns {Promise<FileDataDto>} FileDataDto with file metadata including filename, fileType, fileFormat, size, dimensions, geoLocation, etc.
  */
 export async function uploadMediaFile(file) {
   if (!file || !file.uri) {
@@ -82,7 +82,7 @@ export async function uploadMediaFile(file) {
 
 /**
  * Get a media file by its unique filename
- * @param {string} filename - Unique filename (fileID) returned from upload
+ * @param {string} filename - Unique filename returned from upload
  * @returns {Promise<Response>} Fetch Response object with blob data
  */
 export async function downloadMediaFile(filename) {
@@ -123,7 +123,7 @@ export async function downloadMediaFile(filename) {
 /**
  * Get media file URL (for use in Image/Video components)
  * This constructs the URL that can be used directly in React Native Image components
- * @param {string} filename - Unique filename (fileID) returned from upload
+ * @param {string} filename - Unique filename returned from upload
  * @returns {string} Full URL to the media file
  */
 export function getMediaFileUrl(filename) {
@@ -135,7 +135,7 @@ export function getMediaFileUrl(filename) {
 
 /**
  * Delete a media file by its unique filename
- * @param {string} filename - Unique filename (fileID) to delete
+ * @param {string} filename - Unique filename to delete
  * @returns {Promise<void>}
  */
 export async function deleteMediaFile(filename) {

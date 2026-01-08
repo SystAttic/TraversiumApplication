@@ -1,11 +1,12 @@
 // src/components/trips/MomentCard.jsx
 import React, { useMemo } from "react";
-import { View, Image, Pressable } from "react-native";
+import { View, Pressable } from "react-native";
 import Card from "../Card";
 import TText from "../TText";
 import { spacing, radii } from "../../theme/spacing";
 import { useTheme } from "../../theme";
 import Ionicons from "@expo/vector-icons/Ionicons";
+import AuthenticatedImage from "../AuthenticatedImage";
 
 export default function MomentCard({ moment, mediaById = {}, onOpen }) {
   const { colors } = useTheme();
@@ -40,7 +41,7 @@ export default function MomentCard({ moment, mediaById = {}, onOpen }) {
     if (type === "single") {
       return (
         <Pressable onPress={() => onOpen?.()} style={{ marginTop: spacing.sm }}>
-          <Image
+          <AuthenticatedImage
             source={{ uri: items[0].uri }}
             style={{
               width: "100%",
@@ -63,7 +64,7 @@ export default function MomentCard({ moment, mediaById = {}, onOpen }) {
               onPress={() => onOpen?.()} 
               style={{ flex: 1, marginLeft: idx > 0 ? gap : 0 }}
             >
-              <Image
+              <AuthenticatedImage
                 source={{ uri: item.uri }}
                 style={{
                   width: "100%",
@@ -84,7 +85,7 @@ export default function MomentCard({ moment, mediaById = {}, onOpen }) {
         <View style={{ flexDirection: "row", marginTop: spacing.sm }}>
           {/* Left: large image */}
           <Pressable onPress={() => onOpen?.()} style={{ flex: 1, marginRight: gap }}>
-            <Image
+            <AuthenticatedImage
               source={{ uri: items[0].uri }}
               style={{
                 width: "100%",
@@ -103,7 +104,7 @@ export default function MomentCard({ moment, mediaById = {}, onOpen }) {
                 onPress={() => onOpen?.()} 
                 style={{ flex: 1, marginTop: idx > 0 ? gap : 0 }}
               >
-                <Image
+                <AuthenticatedImage
                   source={{ uri: item.uri }}
                   style={{
                     width: "100%",
@@ -131,7 +132,7 @@ export default function MomentCard({ moment, mediaById = {}, onOpen }) {
                 onPress={() => onOpen?.()} 
                 style={{ flex: 1, marginLeft: idx > 0 ? gap : 0 }}
               >
-                <Image
+                <AuthenticatedImage
                   source={{ uri: item.uri }}
                   style={{
                     width: "100%",
@@ -152,7 +153,7 @@ export default function MomentCard({ moment, mediaById = {}, onOpen }) {
                 onPress={() => onOpen?.()} 
                 style={{ flex: 1, marginLeft: idx > 0 ? gap : 0 }}
               >
-                <Image
+                <AuthenticatedImage
                   source={{ uri: item.uri }}
                   style={{
                     width: "100%",
@@ -180,7 +181,7 @@ export default function MomentCard({ moment, mediaById = {}, onOpen }) {
                 onPress={() => onOpen?.()} 
                 style={{ flex: 1, marginLeft: idx > 0 ? gap : 0 }}
               >
-                <Image
+                <AuthenticatedImage
                   source={{ uri: item.uri }}
                   style={{
                     width: "100%",
@@ -201,7 +202,7 @@ export default function MomentCard({ moment, mediaById = {}, onOpen }) {
                 onPress={() => onOpen?.()} 
                 style={{ flex: 1, marginLeft: idx > 0 ? gap : 0 }}
               >
-                <Image
+                <AuthenticatedImage
                   source={{ uri: item.uri }}
                   style={{
                     width: "100%",

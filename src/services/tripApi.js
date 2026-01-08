@@ -178,3 +178,14 @@ export async function getAllMediaFromTrip(tripId) {
   return http(`/rest/v1/trips/${tripId}/media`, { method: "GET" }, TRIP_SERVICE_BASE);
 }
 
+/**
+ * Autosort trip media
+ * @param {Object} tripDto - TripDto object with media to be autosorted
+ * @returns {Promise<TripDto>}
+ */
+export async function autosortTrip(tripDto) {
+  return http(`/rest/v1/trips/autosort`, {
+    method: "POST",
+    body: JSON.stringify(tripDto),
+  }, TRIP_SERVICE_BASE);
+}

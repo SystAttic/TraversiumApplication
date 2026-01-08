@@ -1,11 +1,12 @@
 import React from "react";
-import { View, ImageBackground, Pressable } from "react-native";
+import { View, Pressable } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "../theme";
 import { spacing } from "../theme/spacing";
 import TText from "./TText";
 import { router } from "expo-router";
+import AuthenticatedImageBackground from "./AuthenticatedImageBackground";
 
 export default function PageMiniHeader({ bgUri, title, subtitle }) {
   const { colors } = useTheme();
@@ -20,7 +21,7 @@ export default function PageMiniHeader({ bgUri, title, subtitle }) {
           backgroundColor: colors.bg.layer1,
         }}
       >
-        <ImageBackground
+        <AuthenticatedImageBackground
           source={bgUri ? { uri: bgUri } : undefined}
           imageStyle={{ opacity: 0.28 }}
           style={{
@@ -59,7 +60,7 @@ export default function PageMiniHeader({ bgUri, title, subtitle }) {
 
           {/* spacer to balance back button */}
           <View style={{ width: 34, height: 34 }} />
-        </ImageBackground>
+        </AuthenticatedImageBackground>
       </View>
     </View>
   );

@@ -1,12 +1,13 @@
 // src/components/users/UserRow.jsx
 import React, { memo } from "react";
-import { View, Image, Pressable } from "react-native";
+import { View, Pressable } from "react-native";
 import Card from "../Card";
 import TText from "../TText";
 import Button from "../Button";
 import { spacing } from "../../theme/spacing";
 import { useTheme } from "../../theme";
 import { getMediaFileUrl } from "../../services/fileStorageApi";
+import AuthenticatedImage from "../AuthenticatedImage";
 
 function UserRowBase({
   user,
@@ -22,7 +23,7 @@ function UserRowBase({
   return (
     <Card style={{ padding: spacing.md }}>
       <Pressable onPress={() => onPress?.(user)} style={{ flexDirection: "row", alignItems: "center" }}>
-        <Image
+        <AuthenticatedImage
           source={avatar ? { uri: getMediaFileUrl(avatar) } : require("../../../assets/profile-default.jpg")}
           style={{ width: 44, height: 44, borderRadius: 999, marginRight: spacing.md }}
           resizeMode="cover"

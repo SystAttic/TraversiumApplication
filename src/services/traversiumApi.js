@@ -17,6 +17,7 @@ function getApiBase(serviceName = "USER_SERVICE") {
     FILE_STORAGE_SERVICE: "EXPO_PUBLIC_TRAVERSIUM_FILE_STORAGE_SERVICE_BASE",
     NOTIFICATION_SERVICE: "EXPO_PUBLIC_TRAVERSIUM_NOTIFICATION_SERVICE_BASE",
     SOCIAL_SERVICE: "EXPO_PUBLIC_TRAVERSIUM_SOCIAL_SERVICE_BASE",
+    AUDIT_SERVICE: "EXPO_PUBLIC_TRAVERSIUM_AUDIT_SERVICE_BASE",
   };
 
   const envVar = envVarMap[serviceName];
@@ -39,6 +40,7 @@ function getApiBase(serviceName = "USER_SERVICE") {
     FILE_STORAGE_SERVICE: 8092,
     NOTIFICATION_SERVICE: 8093,
     SOCIAL_SERVICE: 8094,
+    AUDIT_SERVICE: 8096,
   };
 
   const port = defaultPorts[serviceName] || 8080;
@@ -53,12 +55,10 @@ export const TRIP_SERVICE_BASE = getApiBase("TRIP_SERVICE");
 export const FILE_STORAGE_SERVICE_BASE = getApiBase("FILE_STORAGE_SERVICE");
 export const NOTIFICATION_SERVICE_BASE = getApiBase("NOTIFICATION_SERVICE");
 export const SOCIAL_SERVICE_BASE = getApiBase("SOCIAL_SERVICE");
+export const AUDIT_SERVICE_BASE = getApiBase("AUDIT_SERVICE");
 
 // Legacy export for backward compatibility
 export const API_BASE = USER_SERVICE_BASE;
-
-console.log("USER_SERVICE_BASE:", USER_SERVICE_BASE);
-console.log("TRIP_SERVICE_BASE:", TRIP_SERVICE_BASE);
 
 /**
  * Get Firebase ID token for authentication

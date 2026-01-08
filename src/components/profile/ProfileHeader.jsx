@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Image, Pressable } from "react-native";
+import { View, Pressable } from "react-native";
 import { useTheme } from "../../theme";
 import TText from "../TText";
 import Card from "../Card";
@@ -7,6 +7,7 @@ import Divider from "../Divider";
 import { spacing, radii } from "../../theme/spacing";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { getMediaFileUrl } from "../../services/fileStorageApi";
+import AuthenticatedImage from "../AuthenticatedImage";
 
 function RowAction({ icon, label, onPress }) {
   const { colors } = useTheme();
@@ -49,7 +50,7 @@ export default function ProfileHeader({
     <Card style={{ padding: 0, overflow: "hidden" }}>
       {/* Cover */}
       <View style={{ width: "100%", height: 160, backgroundColor: colors.bg.layer2 }}>
-        <Image
+        <AuthenticatedImage
           source={cover ? { uri: getMediaFileUrl(cover) } : require("../../../assets/cover-default.jpg")}
           style={{ width: "100%", height: "100%" }}
           resizeMode="cover"
@@ -58,19 +59,19 @@ export default function ProfileHeader({
 
       {/* Avatar overlay */}
       <View style={{ alignItems: "center" }}>
-        <View
-          style={{
-            marginTop: -40,
-            width: 96, height: 96, borderRadius: 999, overflow: "hidden",
-            borderWidth: 3, borderColor: colors.bg.layer1, backgroundColor: colors.bg.layer1,
-          }}
-        >
-          <Image
-            source={avatar ? { uri: getMediaFileUrl(avatar) } : require("../../../assets/profile-default.jpg")}
-            style={{ width: "100%", height: "100%" }}
-            resizeMode="cover"
-          />
-        </View>
+          <View
+            style={{
+              marginTop: -40,
+              width: 96, height: 96, borderRadius: 999, overflow: "hidden",
+              borderWidth: 3, borderColor: colors.bg.layer1, backgroundColor: colors.bg.layer1,
+            }}
+          >
+            <AuthenticatedImage
+              source={avatar ? { uri: getMediaFileUrl(avatar) } : require("../../../assets/profile-default.jpg")}
+              style={{ width: "100%", height: "100%" }}
+              resizeMode="cover"
+            />
+          </View>
       </View>
 
       {/* Identity */}

@@ -1,5 +1,5 @@
 import React, { useMemo } from "react";
-import { View, Image, Pressable } from "react-native";
+import { View, Pressable, Image } from "react-native";
 import Card from "../Card";
 import TText from "../TText";
 import ProgressBar from "../ProgressBar";
@@ -10,6 +10,7 @@ import { Link } from "expo-router";
 import { spacing } from "../../theme/spacing";
 import { useTheme } from "../../theme";
 import { getMediaFileUrl } from "../../services/fileStorageApi";
+import AuthenticatedImage from "../AuthenticatedImage";
 
 /**
  * Shared profile content component used by both own profile and visitor profile
@@ -115,7 +116,7 @@ export default function ProfileContent({
                 <Link key={t.tripId || `trip-${i}`} href={`/trips/${t.tripId}`} asChild>
                   <Pressable>
                     <Card style={{ padding: 0 }}>
-                      <Image 
+                      <AuthenticatedImage 
                         source={t.coverPhotoUrl ? { uri: getMediaFileUrl(t.coverPhotoUrl) } : require("../../../assets/cover-default.jpg")} 
                         style={{ width: "100%", height: 140 }} 
                       />

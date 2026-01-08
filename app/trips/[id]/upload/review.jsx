@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { View, ScrollView, Pressable, Image, ActivityIndicator, Alert } from "react-native";
+import { View, ScrollView, Pressable, ActivityIndicator, Alert } from "react-native";
 import { useLocalSearchParams, router } from "expo-router";
 import Screen from "../../../../src/components/Screen";
 import AppHeader from "../../../../src/components/AppHeader";
@@ -13,9 +13,17 @@ import { getTripById, updateTrip } from "../../../../src/services/tripApi";
 import { deleteMediaFromAlbum, addMediaToAlbum } from "../../../../src/services/momentApi";
 import { getMediaFileUrl } from "../../../../src/services/fileStorageApi";
 import { LinearGradient } from "expo-linear-gradient";
+import AuthenticatedImage from "../../../../src/components/AuthenticatedImage";
 
 export default function ReviewScreen() {
-  const { id: tripId, assignments: assignmentsJson, originalOrder: originalOrderJson, reorderedAlbums: reorderedAlbumsJson } = useLocalSearchParams();
+  const { 
+    id: tripId, 
+    assignments: assignmentsJson, 
+    originalOrder: originalOrderJson, 
+    reorderedAlbums: reorderedAlbumsJson,
+    autosorted: autosortedParam,
+    autosortedTrip: autosortedTripJson
+  } = useLocalSearchParams();
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
 
@@ -24,6 +32,21 @@ export default function ReviewScreen() {
     const finalId = Array.isArray(tripId) ? tripId[0] : tripId;
     return Number(finalId);
   }, [tripId]);
+
+  const isAutosorted = useMemo(() => {
+    const param = Array.isArray(autosortedParam) ? autosortedParam[0] : autosortedParam;
+    return param === "true";
+  }, [autosortedParam]);
+
+  const autosortedTrip = useMemo(() => {
+    if (!isAutosorted) return null;
+    try {
+      const json = Array.isArray(autosortedTripJson) ? autosortedTripJson[0] : autosortedTripJson;
+      return json ? JSON.parse(json) : null;
+    } catch {
+      return null;
+    }
+  }, [autosortedTripJson, isAutosorted]);
 
   const assignments = useMemo(() => {
     try {
@@ -65,14 +88,23 @@ export default function ReviewScreen() {
     (async () => {
       try {
         setLoading(true);
-        const tripData = await getTripById(tripIdNum);
+        
+        let tripData;
+        if (isAutosorted && autosortedTrip) {
+          // Use autosorted trip data directly
+          tripData = autosortedTrip;
+        } else {
+          // Load from API
+          tripData = await getTripById(tripIdNum);
+        }
+        
         if (!on) return;
 
         const defaultAlbumId = tripData.defaultAlbum;
         const allAlbums = tripData.albums || [];
         const defaultAlbumData = allAlbums.find((a) => a.albumId === defaultAlbumId);
         
-        // Use reordered albums from params if available, otherwise use from API
+        // Use reordered albums from params if available, otherwise use from API/autosorted data
         let otherAlbums;
         if (reorderedAlbumsFromParams && reorderedAlbumsFromParams.length > 0) {
           // Use the reordered albums passed from manual-arrange
@@ -84,7 +116,8 @@ export default function ReviewScreen() {
             return fullAlbum || reorderedAlbum;
           });
         } else {
-          // Fallback to API order if no reordered albums passed
+          // For autosorted, use the albums from autosorted trip (excluding default)
+          // For manual, fallback to API order
           otherAlbums = allAlbums.filter((a) => a.albumId !== defaultAlbumId);
         }
 
@@ -101,10 +134,23 @@ export default function ReviewScreen() {
       }
     })();
     return () => { on = false; };
-  }, [tripIdNum, reorderedAlbumsFromParams]);
+  }, [tripIdNum, reorderedAlbumsFromParams, isAutosorted, autosortedTrip]);
 
-  // Group assignments by album for review
+  // Group assignments by album for review (for manual arrange)
+  // For autosorted, we show all albums with their media directly
   const assignmentsByAlbum = useMemo(() => {
+    if (isAutosorted) {
+      // For autosorted, return albums with their media directly
+      const grouped = {};
+      albums.forEach(album => {
+        if (album.media && album.media.length > 0) {
+          grouped[album.albumId] = album.media;
+        }
+      });
+      return grouped;
+    }
+    
+    // For manual arrange, use assignments
     const grouped = {};
     Object.entries(assignments).forEach(([mediaId, albumId]) => {
       if (!grouped[albumId]) {
@@ -116,18 +162,37 @@ export default function ReviewScreen() {
       }
     });
     return grouped;
-  }, [assignments, unorganizedMedia]);
+  }, [assignments, unorganizedMedia, albums, isAutosorted]);
 
   const hasReordered = useMemo(() => {
+    if (isAutosorted) {
+      // For autosorted, we consider it reordered if albums exist
+      return albums.length > 0;
+    }
     return JSON.stringify(albums.map(a => a.albumId)) !== JSON.stringify(originalAlbumOrder);
-  }, [albums, originalAlbumOrder]);
+  }, [albums, originalAlbumOrder, isAutosorted]);
 
   const handleApplyChanges = async () => {
     setApplying(true);
     const errors = [];
 
     try {
-      // Apply album reordering if changed
+      // For autosorted trips, just update the trip with the autosorted data
+      if (isAutosorted && autosortedTrip) {
+        try {
+          await updateTrip(autosortedTrip);
+          Alert.alert("Success", "Your photos have been organized into moments!", [
+            { text: "OK", onPress: () => router.replace(`/trips/${tripIdNum}`) },
+          ]);
+          return;
+        } catch (error) {
+          console.error("Failed to apply autosorted changes:", error);
+          Alert.alert("Error", "Failed to apply changes. Please try again.");
+          return;
+        }
+      }
+
+      // Apply album reordering if changed (for manual arrange)
       if (hasReordered) {
         try {
           // Update trip with reordered albums (including default album)
@@ -211,8 +276,10 @@ export default function ReviewScreen() {
     );
   }
 
-  const assignedCount = Object.keys(assignments).length;
-  const skippedCount = unorganizedMedia.length - assignedCount;
+  const assignedCount = isAutosorted 
+    ? albums.reduce((sum, album) => sum + (album.media?.length || 0), 0)
+    : Object.keys(assignments).length;
+  const skippedCount = isAutosorted ? 0 : unorganizedMedia.length - assignedCount;
 
   return (
     <Screen>
@@ -226,8 +293,27 @@ export default function ReviewScreen() {
       >
         <Card>
           <TText weight="bold" style={{ fontSize: 20, marginBottom: spacing.md }}>
-            Here is review of your changes:
+            {isAutosorted ? "Review Auto-Organized Moments:" : "Here is review of your changes:"}
           </TText>
+          
+          {isAutosorted && (
+            <View
+              style={{
+                padding: spacing.sm,
+                backgroundColor: colors.status.info + "22",
+                borderRadius: radii.sm,
+                marginBottom: spacing.md,
+                flexDirection: "row",
+                alignItems: "center",
+                gap: spacing.xs,
+              }}
+            >
+              <Ionicons name="sparkles" size={16} color={colors.status.info} />
+              <TText size="sm" style={{ color: colors.status.info }}>
+                Photos have been automatically organized into moments
+              </TText>
+            </View>
+          )}
 
           {/* Reordering indicator */}
           {hasReordered && (
@@ -271,9 +357,10 @@ export default function ReviewScreen() {
                         contentContainerStyle={{ gap: spacing.xs }}
                       >
                         {mediaInAlbum.map((media) => {
+                          if (!media.pathUrl) return null; // Skip media without pathUrl
                           const mediaUrl = getMediaFileUrl(media.pathUrl);
                           return (
-                            <Image
+                            <AuthenticatedImage
                               key={media.mediaId}
                               source={{ uri: mediaUrl }}
                               style={{

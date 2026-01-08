@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { ScrollView, View, Image, Pressable } from "react-native";
+import { ScrollView, View, Pressable } from "react-native";
 import Screen from "../../../src/components/Screen";
 import AppHeader from "../../../src/components/AppHeader";
 import Card from "../../../src/components/Card";
@@ -12,6 +12,7 @@ import SkeletonRect from "../../../src/components/skeleton/SkeletonRect";
 import SkeletonText from "../../../src/components/skeleton/SkeletonText";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { getMediaFileUrl } from "../../../src/services/fileStorageApi";
+import AuthenticatedImage from "../../../src/components/AuthenticatedImage";
 
 export default function UserTripsList() {
   const { username } = useLocalSearchParams();
@@ -60,7 +61,7 @@ export default function UserTripsList() {
               <Link key={t.tripId || `utl-${i}`} href={`/trips/${t.tripId}`} asChild>
                 <Pressable>
                   <Card style={{ padding: 0 }}>
-                    <Image 
+                    <AuthenticatedImage 
                       source={t.coverPhotoUrl ? { uri: getMediaFileUrl(t.coverPhotoUrl) } : require("../../../assets/cover-default.jpg")} 
                       style={{ width: "100%", height: 140 }} 
                     />

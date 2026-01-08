@@ -1,16 +1,13 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
-import { View, ActivityIndicator, ScrollView, Pressable } from "react-native";
+import React, { useEffect, useMemo, useState } from "react";
+import { View, ActivityIndicator, ScrollView } from "react-native";
 import { useLocalSearchParams, router } from "expo-router";
 import PageMiniHeader from "../../../../src/components/PageMiniHeader";
 import MomentCollage from "../../../../src/components/trips/MomentCollage";
-import TText from "../../../../src/components/TText";
-import Ionicons from "@expo/vector-icons/Ionicons";
 import { spacing } from "../../../../src/theme/spacing";
 import { useTheme } from "../../../../src/theme";
 import { getTripById } from "../../../../src/services/tripApi";
 import { getMediaFileUrl } from "../../../../src/services/fileStorageApi";
 import { auth } from "../../../../src/services/firebase";
-import SafeBottomBar from "../../../../src/components/SafeBottomBar";
 
 export default function MomentScreen() {
   const { id, momentId } = useLocalSearchParams();
@@ -18,7 +15,6 @@ export default function MomentScreen() {
 
   const [trip, setTrip] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [panelH, setPanelH] = useState(96);  // measured height of bottom panel
 
   useEffect(() => {
     let on = true;
@@ -48,6 +44,7 @@ export default function MomentScreen() {
           if (album.albumId === tripData.defaultAlbum) {
             // Add media from default album to allMedia
             album.media?.forEach((m) => {
+              if (!m.pathUrl) return; // Skip media without pathUrl
               allMedia.push({
                 id: String(m.mediaId),
                 uri: getMediaFileUrl(m.pathUrl),
@@ -71,6 +68,7 @@ export default function MomentScreen() {
             
             // Add media from this album
             albumMedia.forEach((m) => {
+              if (!m.pathUrl) return; // Skip media without pathUrl
               allMedia.push({
                 id: String(m.mediaId),
                 uri: getMediaFileUrl(m.pathUrl),
@@ -86,7 +84,7 @@ export default function MomentScreen() {
           tripId: tripData.tripId,
           title: tripData.title || "",
           description: tripData.description || "",
-          coverUri: tripData.coverPhotoUrl || null,
+          coverUri: tripData.coverPhotoUrl ? getMediaFileUrl(tripData.coverPhotoUrl) : null,
           visibility: tripData.visibility || "PRIVATE",
           ownerId: tripData.ownerId,
           currentUserId,
@@ -140,55 +138,11 @@ export default function MomentScreen() {
 
       {/* Collage is the ONLY scrollable region on this screen */}
       <ScrollView
-        contentContainerStyle={{ paddingTop: spacing.md, paddingBottom: panelH + 8 }}
+        contentContainerStyle={{ paddingTop: spacing.md, paddingBottom: spacing.xl }}
         overScrollMode="never"
       >
         <MomentCollage media={media} onOpen={onOpenMedia} />
       </ScrollView>
-
-      {/* Bottom fixed info panel */}
-      <View
-        onLayout={(e) => setPanelH(e.nativeEvent.layout.height)}
-        style={{
-          position: "absolute",
-          left: 0, right: 0, bottom: 0,
-          backgroundColor: colors.bg.layer1,
-          borderTopWidth: 1,
-          borderTopColor: colors.border,
-          paddingHorizontal: spacing.xl,
-          paddingTop: spacing.md,
-        }}
-      >
-        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: spacing.xs }}>
-          <TText weight="bold" style={{ fontSize: 18, flex: 1, marginRight: spacing.md }} numberOfLines={2}>
-            {moment.title}
-          </TText>
-
-          <View style={{ flexDirection: "row", alignItems: "center" }}>
-            <Pressable style={{ flexDirection: "row", alignItems: "center", marginRight: spacing.md }}>
-              <Ionicons name="heart-outline" size={18} color={colors.text.primary} />
-              <TText dim size="sm" style={{ marginLeft: 4 }}>24</TText>
-            </Pressable>
-
-            <Pressable
-              onPress={() => router.push(`/trips/${id}/moments/${momentId}/comments`)}
-              style={{ flexDirection: "row", alignItems: "center" }}
-            >
-              <Ionicons name="chatbubble-ellipses-outline" size={18} color={colors.text.primary} />
-              <TText dim size="sm" style={{ marginLeft: 4 }}>12</TText>
-            </Pressable>
-          </View>
-        </View>
-
-        {!!moment.description && (
-          <TText dim style={{ marginTop: 6, marginBottom: 8 }}>
-            {moment.description}
-          </TText>
-        )}
-
-        {/* Pure inset spacer (empty bar) */}
-        <SafeBottomBar backgroundColor={colors.bg.layer1} />
-      </View>
     </View>
   );
 }

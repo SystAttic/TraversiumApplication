@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { View, ScrollView, Alert, Image } from "react-native";
+import { View, ScrollView, Alert } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import Screen from "../../src/components/Screen";
 import AppHeader from "../../src/components/AppHeader";
@@ -14,6 +14,7 @@ import { auth } from "../../src/services/firebase";
 import SkeletonRect from "../../src/components/skeleton/SkeletonRect";
 import SkeletonText from "../../src/components/skeleton/SkeletonText";
 import Ionicons from "@expo/vector-icons/Ionicons";
+import AuthenticatedImage from "../../src/components/AuthenticatedImage";
 
 export default function JoinTripScreen() {
   const { colors } = useTheme();
@@ -138,13 +139,13 @@ export default function JoinTripScreen() {
         {/* Trip Details Card */}
         <Card style={{ padding: 0 }}>
           {trip.coverPhotoUrl ? (
-            <Image
+            <AuthenticatedImage
               source={{ uri: trip.coverPhotoUrl }}
               style={{ width: "100%", height: 200 }}
               resizeMode="cover"
             />
           ) : (
-            <Image
+            <AuthenticatedImage
               source={require("../../assets/cover-default.jpg")}
               style={{ width: "100%", height: 200 }}
               resizeMode="cover"

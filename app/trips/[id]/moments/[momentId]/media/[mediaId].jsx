@@ -1,14 +1,18 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { View, Image, Pressable, FlatList, Dimensions, TouchableWithoutFeedback } from "react-native";
+import { View, Pressable, FlatList, Dimensions, TouchableWithoutFeedback, TextInput, ScrollView, ActivityIndicator, Alert } from "react-native";
 import { useLocalSearchParams, router } from "expo-router";
 import { getTripById } from "../../../../../../src/services/tripApi";
 import { getMediaFileUrl } from "../../../../../../src/services/fileStorageApi";
 import { auth } from "../../../../../../src/services/firebase";
+import { getLikeCount, getComments, likeMedia, unlikeMedia, createComment, getCommentReplies } from "../../../../../../src/services/socialApi";
+import { getUserById } from "../../../../../../src/services/userApi";
 import TText from "../../../../../../src/components/TText";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useTheme } from "../../../../../../src/theme";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { spacing } from "../../../../../../src/theme/spacing";
+import { spacing, radii } from "../../../../../../src/theme/spacing";
+import AuthenticatedImage from "../../../../../../src/components/AuthenticatedImage";
+import BottomSheet from "../../../../../../src/components/BottomSheet";
 
 const UI_HIDE_AFTER = 2500;
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
@@ -38,6 +42,17 @@ export default function MediaViewer() {
   const [trip, setTrip] = useState(null);
   const [index, setIndex] = useState(0);
   const [showUI, setShowUI] = useState(true);
+  const [likeCount, setLikeCount] = useState(0);
+  const [commentCount, setCommentCount] = useState(0);
+  const [isLiked, setIsLiked] = useState(false);
+  const [showCommentsSheet, setShowCommentsSheet] = useState(false);
+  const [comments, setComments] = useState([]);
+  const [loadingComments, setLoadingComments] = useState(false);
+  const [newCommentText, setNewCommentText] = useState("");
+  const [postingComment, setPostingComment] = useState(false);
+  const [replyingTo, setReplyingTo] = useState(null);
+  const [replyText, setReplyText] = useState("");
+  const [expandedReplies, setExpandedReplies] = useState(new Set());
   const timer = useRef(null);
   const flatListRef = useRef(null);
   const indexRef = useRef(0);
@@ -71,6 +86,7 @@ export default function MediaViewer() {
           if (album.albumId === tripData.defaultAlbum) {
             // Add media from default album to allMedia
             album.media?.forEach((m) => {
+              if (!m.pathUrl) return; // Skip media without pathUrl
               allMedia.push({
                 id: String(m.mediaId),
                 uri: getMediaFileUrl(m.pathUrl),
@@ -94,6 +110,7 @@ export default function MediaViewer() {
             
             // Add media from this album
             albumMedia.forEach((m) => {
+              if (!m.pathUrl) return; // Skip media without pathUrl
               allMedia.push({
                 id: String(m.mediaId),
                 uri: getMediaFileUrl(m.pathUrl),
@@ -116,7 +133,7 @@ export default function MediaViewer() {
           tripId: tripData.tripId,
           title: tripData.title || "",
           description: tripData.description || "",
-          coverUri: tripData.coverPhotoUrl || null,
+          coverUri: tripData.coverPhotoUrl ? getMediaFileUrl(tripData.coverPhotoUrl) : null,
           visibility: tripData.visibility || "PRIVATE",
           ownerId: tripData.ownerId,
           currentUserId,
@@ -169,13 +186,60 @@ export default function MediaViewer() {
 
   const current = media[index];
 
-  // Get uploader info for current media
-  const uploaderInfo = useMemo(() => {
-    if (!current?.uploader || !trip?.collaborators) return null;
-    const uploader = trip.collaborators.find(u => u.id === current.uploader) || 
-                     trip.collaborators[0];
-    return uploader;
-  }, [current, trip]);
+  // Load likes and comments for current media
+  useEffect(() => {
+    if (!current?.id) {
+      setLikeCount(0);
+      setCommentCount(0);
+      return;
+    }
+
+    let on = true;
+    const mediaIdNum = Number(current.id);
+    if (!mediaIdNum || isNaN(mediaIdNum)) {
+      setLikeCount(0);
+      setCommentCount(0);
+      return;
+    }
+
+    (async () => {
+      try {
+        // Load like count
+        try {
+          const likeData = await getLikeCount(mediaIdNum);
+          if (!on) return;
+          setLikeCount(likeData?.likeCount || 0);
+          setIsLiked(likeData?.isLiked || false);
+        } catch (error) {
+          // Handle errors gracefully - treat as 0 likes
+          // Backend should return empty results, but handle 404 as fallback
+          if (on) {
+            setLikeCount(0);
+            setIsLiked(false);
+          }
+        }
+
+        // Load comment count
+        try {
+          const commentsData = await getComments(mediaIdNum, 0, 1);
+          if (!on) return;
+          setCommentCount(commentsData?.totalElements || 0);
+        } catch (error) {
+          // Handle errors gracefully - treat as 0 comments
+          // Backend should return empty page, but handle 404 as fallback
+          if (on) setCommentCount(0);
+        }
+      } catch (error) {
+        // Fallback error handling
+        if (on) {
+          setLikeCount(0);
+          setCommentCount(0);
+        }
+      }
+    })();
+
+    return () => { on = false; };
+  }, [current?.id]);
 
   const scheduleHide = () => {
     if (timer.current) clearTimeout(timer.current);
@@ -258,6 +322,125 @@ export default function MediaViewer() {
     }
   }).current;
 
+  // Handle like/unlike
+  const handleLikeToggle = async () => {
+    if (!current?.id) return;
+    const mediaIdNum = Number(current.id);
+    if (!mediaIdNum || isNaN(mediaIdNum)) return;
+
+    const wasLiked = isLiked;
+    // Optimistic update
+    setIsLiked(!wasLiked);
+    setLikeCount(prev => wasLiked ? Math.max(0, prev - 1) : prev + 1);
+
+    try {
+      if (wasLiked) {
+        await unlikeMedia(mediaIdNum);
+      } else {
+        await likeMedia(mediaIdNum);
+      }
+      // Refresh like count to get accurate data
+      const likeData = await getLikeCount(mediaIdNum);
+      setLikeCount(likeData?.likeCount || 0);
+      setIsLiked(likeData?.isLiked || false);
+    } catch (error) {
+      // Revert on error
+      setIsLiked(wasLiked);
+      setLikeCount(prev => wasLiked ? prev + 1 : Math.max(0, prev - 1));
+      Alert.alert("Error", "Failed to update like. Please try again.");
+    }
+  };
+
+  // Load comments when sheet opens
+  useEffect(() => {
+    if (!showCommentsSheet || !current?.id) return;
+    
+    const mediaIdNum = Number(current.id);
+    if (!mediaIdNum || isNaN(mediaIdNum)) return;
+
+    let on = true;
+    setLoadingComments(true);
+
+    (async () => {
+      try {
+        const commentsData = await getComments(mediaIdNum, 0, 50);
+        if (!on) return;
+        setComments(commentsData?.content || []);
+      } catch (error) {
+        console.error("Failed to load comments:", error);
+        if (on) setComments([]);
+      } finally {
+        if (on) setLoadingComments(false);
+      }
+    })();
+
+    return () => { on = false; };
+  }, [showCommentsSheet, current?.id]);
+
+  // Post new comment
+  const handlePostComment = async () => {
+    if (!newCommentText.trim() || !current?.id) return;
+    const mediaIdNum = Number(current.id);
+    if (!mediaIdNum || isNaN(mediaIdNum)) return;
+
+    setPostingComment(true);
+    try {
+      await createComment(mediaIdNum, { content: newCommentText.trim() });
+      setNewCommentText("");
+      // Reload comments
+      const commentsData = await getComments(mediaIdNum, 0, 50);
+      setComments(commentsData?.content || []);
+      setCommentCount(commentsData?.totalElements || 0);
+    } catch (error) {
+      console.error("Failed to post comment:", error);
+      Alert.alert("Error", "Failed to post comment. Please try again.");
+    } finally {
+      setPostingComment(false);
+    }
+  };
+
+  // Post reply
+  const handlePostReply = async (parentCommentId) => {
+    if (!replyText.trim() || !current?.id) return;
+    const mediaIdNum = Number(current.id);
+    if (!mediaIdNum || isNaN(mediaIdNum)) return;
+
+    setPostingComment(true);
+    try {
+      await createComment(mediaIdNum, { content: replyText.trim(), parentId: parentCommentId });
+      setReplyText("");
+      setReplyingTo(null);
+      // Reload comments
+      const commentsData = await getComments(mediaIdNum, 0, 50);
+      setComments(commentsData?.content || []);
+      setCommentCount(commentsData?.totalElements || 0);
+    } catch (error) {
+      console.error("Failed to post reply:", error);
+      Alert.alert("Error", "Failed to post reply. Please try again.");
+    } finally {
+      setPostingComment(false);
+    }
+  };
+
+  // Toggle replies visibility
+  const toggleReplies = async (commentId) => {
+    const newExpanded = new Set(expandedReplies);
+    if (newExpanded.has(commentId)) {
+      newExpanded.delete(commentId);
+    } else {
+      newExpanded.add(commentId);
+      // Load replies if not already loaded
+      try {
+        const repliesData = await getCommentReplies(commentId, 0, 50);
+        // Update comment with replies (we'll need to store this in state)
+        // For now, just mark as expanded
+      } catch (error) {
+        console.error("Failed to load replies:", error);
+      }
+    }
+    setExpandedReplies(newExpanded);
+  };
+
   if (!current) {
     return <View style={{ flex: 1, backgroundColor: "black" }} />;
   }
@@ -284,9 +467,10 @@ export default function MediaViewer() {
         renderItem={({ item }) => (
           <TouchableWithoutFeedback onPress={toggleUI}>
             <View style={{ width: SCREEN_WIDTH, height: "100%", alignItems: "center", justifyContent: "center" }}>
-              <Image
+              <AuthenticatedImage
                 source={{ uri: item.uri }}
-                style={{ width: "100%", height: "100%", resizeMode: "contain" }}
+                style={{ width: "100%", height: "100%" }}
+                resizeMode="contain"
               />
             </View>
           </TouchableWithoutFeedback>
@@ -322,7 +506,7 @@ export default function MediaViewer() {
           </Pressable>
 
           <TText style={{ color: "#fff" }}>
-            {index + 1} / {media.length}
+            {String(index + 1)} / {String(media.length)}
           </TText>
 
           <View style={{ width: 36, height: 36 }} />
@@ -363,51 +547,372 @@ export default function MediaViewer() {
         </>
       )}
 
-      {/* bottom uploader info */}
+      {/* bottom bar: likes/comments */}
       {showUI && current && (
         <View style={{ 
           position: "absolute", 
-          left: spacing.md, 
           right: spacing.md, 
           bottom: insets.bottom + spacing.md,
           flexDirection: "row",
           alignItems: "center",
           zIndex: 10,
         }}>
-          {uploaderInfo && (
-            <>
-              <Image
-                source={{ 
-                  uri: uploaderInfo.avatarPhotoReference 
-                    ? getMediaFileUrl(uploaderInfo.avatarPhotoReference)
-                    : uploaderInfo.avatar 
-                    ? getMediaFileUrl(uploaderInfo.avatar)
-                    : "https://i.pravatar.cc/100?img=1"
-                }}
-                style={{ 
-                  width: 32, 
-                  height: 32, 
-                  borderRadius: 16,
-                  marginRight: spacing.sm,
-                  backgroundColor: "rgba(255,255,255,0.2)",
-                }}
-              />
-              <View style={{ flex: 1 }}>
-                <TText style={{ color: "#fff", fontSize: 14, fontWeight: "500" }}>
-                  {uploaderInfo.displayName || uploaderInfo.username || "Unknown"}
-                </TText>
-                {current.createdAt && (
-                  <TText style={{ color: "rgba(255,255,255,0.7)", fontSize: 12, marginTop: 2 }}>
-                    {formatTime(current.createdAt)}
-                  </TText>
-                )}
-              </View>
-            </>
-          )}
-          {!uploaderInfo && current.createdAt && (
-            <TText style={{ color: "rgba(255,255,255,0.7)", fontSize: 12 }}>
-              {formatTime(current.createdAt)}
+          {/* Comments */}
+          <Pressable
+            onPress={() => setShowCommentsSheet(true)}
+            style={{ flexDirection: "row", alignItems: "center", marginRight: spacing.md }}
+          >
+            <Ionicons name="chatbubble-outline" size={18} color="#fff" />
+            <TText style={{ color: "#fff", fontSize: 14, fontWeight: "500", marginLeft: 4 }}>
+              {String(commentCount)}
             </TText>
+          </Pressable>
+          
+          {/* Likes */}
+          <Pressable
+            onPress={handleLikeToggle}
+            style={{ flexDirection: "row", alignItems: "center" }}
+          >
+            <Ionicons 
+              name={isLiked ? "heart" : "heart-outline"} 
+              size={18} 
+              color={isLiked ? "#ff3040" : "#fff"} 
+            />
+            <TText style={{ color: "#fff", fontSize: 14, fontWeight: "500", marginLeft: 4 }}>
+              {String(likeCount)}
+            </TText>
+          </Pressable>
+        </View>
+      )}
+
+      {/* Comments Bottom Sheet */}
+      <BottomSheet
+        visible={showCommentsSheet}
+        onClose={() => {
+          setShowCommentsSheet(false);
+          setReplyingTo(null);
+          setReplyText("");
+        }}
+        maxHeight="90%"
+      >
+        <CommentsView
+          comments={comments}
+          loadingComments={loadingComments}
+          newCommentText={newCommentText}
+          setNewCommentText={setNewCommentText}
+          postingComment={postingComment}
+          handlePostComment={handlePostComment}
+          replyingTo={replyingTo}
+          setReplyingTo={setReplyingTo}
+          replyText={replyText}
+          setReplyText={setReplyText}
+          handlePostReply={handlePostReply}
+          expandedReplies={expandedReplies}
+          toggleReplies={toggleReplies}
+          formatTime={formatTime}
+          colors={colors}
+          spacing={spacing}
+        />
+      </BottomSheet>
+    </View>
+  );
+}
+
+// Comments View Component
+function CommentsView({
+  comments,
+  loadingComments,
+  newCommentText,
+  setNewCommentText,
+  postingComment,
+  handlePostComment,
+  replyingTo,
+  setReplyingTo,
+  replyText,
+  setReplyText,
+  handlePostReply,
+  expandedReplies,
+  toggleReplies,
+  formatTime,
+  colors,
+  spacing,
+}) {
+  const [commentReplies, setCommentReplies] = useState({});
+  const [loadingReplies, setLoadingReplies] = useState({});
+
+  const loadReplies = async (commentId) => {
+    if (commentReplies[commentId]) return; // Already loaded
+    
+    setLoadingReplies(prev => ({ ...prev, [commentId]: true }));
+    try {
+      const repliesData = await getCommentReplies(commentId, 0, 50);
+      setCommentReplies(prev => ({ ...prev, [commentId]: repliesData?.content || [] }));
+    } catch (error) {
+      console.error("Failed to load replies:", error);
+      setCommentReplies(prev => ({ ...prev, [commentId]: [] }));
+    } finally {
+      setLoadingReplies(prev => ({ ...prev, [commentId]: false }));
+    }
+  };
+
+  const handleToggleReplies = (commentId) => {
+    const newExpanded = new Set(expandedReplies);
+    if (newExpanded.has(commentId)) {
+      newExpanded.delete(commentId);
+    } else {
+      newExpanded.add(commentId);
+      loadReplies(commentId);
+    }
+    toggleReplies(commentId);
+  };
+
+  return (
+    <View style={{ flex: 1 }}>
+      {/* Header */}
+      <View style={{ paddingHorizontal: spacing.md, paddingBottom: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.border }}>
+        <TText weight="bold" style={{ fontSize: 18 }}>Comments</TText>
+      </View>
+
+      {/* Comments List */}
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: spacing.md }}>
+        {loadingComments ? (
+          <View style={{ alignItems: "center", padding: spacing.xl }}>
+            <ActivityIndicator size="large" color={colors.accent.primary} />
+          </View>
+        ) : comments.length === 0 ? (
+          <View style={{ alignItems: "center", padding: spacing.xl }}>
+            <TText dim>No comments yet. Be the first to comment!</TText>
+          </View>
+        ) : (
+          comments.map((comment) => (
+            <CommentItem
+              key={comment.commentId}
+              comment={comment}
+              replyingTo={replyingTo}
+              setReplyingTo={setReplyingTo}
+              replyText={replyText}
+              setReplyText={setReplyText}
+              handlePostReply={handlePostReply}
+              expandedReplies={expandedReplies}
+              handleToggleReplies={handleToggleReplies}
+              commentReplies={commentReplies[comment.commentId] || []}
+              loadingReplies={loadingReplies[comment.commentId]}
+              formatTime={formatTime}
+              colors={colors}
+              spacing={spacing}
+            />
+          ))
+        )}
+      </ScrollView>
+
+      {/* New Comment Input */}
+      {replyingTo ? (
+        <View style={{ padding: spacing.md, borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.bg.layer2 }}>
+          <View style={{ flexDirection: "row", alignItems: "center", marginBottom: spacing.sm }}>
+            <TText size="sm" dim>Replying to comment</TText>
+            <Pressable onPress={() => setReplyingTo(null)} style={{ marginLeft: "auto" }}>
+              <Ionicons name="close" size={20} color={colors.text.muted} />
+            </Pressable>
+          </View>
+          <View style={{ flexDirection: "row", gap: spacing.sm }}>
+            <TextInput
+              value={replyText}
+              onChangeText={setReplyText}
+              placeholder="Write a reply..."
+              placeholderTextColor={colors.text.muted}
+              multiline
+              style={{
+                flex: 1,
+                borderWidth: 1,
+                borderColor: colors.border,
+                borderRadius: radii.md,
+                paddingHorizontal: spacing.md,
+                paddingVertical: spacing.sm,
+                color: colors.text.primary,
+                backgroundColor: colors.bg.layer1,
+                maxHeight: 100,
+              }}
+            />
+            <Pressable
+              onPress={() => handlePostReply(replyingTo)}
+              disabled={!replyText.trim() || postingComment}
+              style={{
+                paddingHorizontal: spacing.md,
+                paddingVertical: spacing.sm,
+                borderRadius: radii.md,
+                backgroundColor: replyText.trim() && !postingComment ? colors.accent.primary : colors.bg.layer3,
+                justifyContent: "center",
+              }}
+            >
+              {postingComment ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <Ionicons name="send" size={20} color="#fff" />
+              )}
+            </Pressable>
+          </View>
+        </View>
+      ) : (
+        <View style={{ padding: spacing.md, borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.bg.layer2 }}>
+          <View style={{ flexDirection: "row", gap: spacing.sm }}>
+            <TextInput
+              value={newCommentText}
+              onChangeText={setNewCommentText}
+              placeholder="Write a comment..."
+              placeholderTextColor={colors.text.muted}
+              multiline
+              style={{
+                flex: 1,
+                borderWidth: 1,
+                borderColor: colors.border,
+                borderRadius: radii.md,
+                paddingHorizontal: spacing.md,
+                paddingVertical: spacing.sm,
+                color: colors.text.primary,
+                backgroundColor: colors.bg.layer1,
+                maxHeight: 100,
+              }}
+            />
+            <Pressable
+              onPress={handlePostComment}
+              disabled={!newCommentText.trim() || postingComment}
+              style={{
+                paddingHorizontal: spacing.md,
+                paddingVertical: spacing.sm,
+                borderRadius: radii.md,
+                backgroundColor: newCommentText.trim() && !postingComment ? colors.accent.primary : colors.bg.layer3,
+                justifyContent: "center",
+              }}
+            >
+              {postingComment ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <Ionicons name="send" size={20} color="#fff" />
+              )}
+            </Pressable>
+          </View>
+        </View>
+      )}
+    </View>
+  );
+}
+
+// Comment Item Component
+function CommentItem({
+  comment,
+  replyingTo,
+  setReplyingTo,
+  replyText,
+  setReplyText,
+  handlePostReply,
+  expandedReplies,
+  handleToggleReplies,
+  commentReplies,
+  loadingReplies,
+  formatTime,
+  colors,
+  spacing,
+}) {
+  const [commentUser, setCommentUser] = useState(null);
+
+  useEffect(() => {
+    if (comment.userId) {
+      getUserById(comment.userId)
+        .then(setCommentUser)
+        .catch(() => setCommentUser(null));
+    }
+  }, [comment.userId]);
+
+  const isExpanded = expandedReplies.has(comment.commentId);
+  const hasReplies = comment.replyCount > 0;
+
+  return (
+    <View style={{ marginBottom: spacing.md, paddingBottom: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.border }}>
+      {/* Comment Content */}
+      <View style={{ flexDirection: "row", gap: spacing.sm }}>
+        {/* Avatar */}
+        <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: colors.bg.layer3, alignItems: "center", justifyContent: "center" }}>
+          {commentUser?.avatarPhotoReference ? (
+            <AuthenticatedImage
+              source={{ uri: getMediaFileUrl(commentUser.avatarPhotoReference) }}
+              style={{ width: 32, height: 32, borderRadius: 16 }}
+              resizeMode="cover"
+            />
+          ) : (
+            <Ionicons name="person" size={20} color={colors.text.muted} />
+          )}
+        </View>
+
+        {/* Comment Text */}
+        <View style={{ flex: 1 }}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.xs, marginBottom: 2 }}>
+            <TText weight="500" size="sm">
+              {commentUser?.displayName || commentUser?.username || "Unknown"}
+            </TText>
+            {comment.createdAt && (
+              <TText dim size="xs">
+                {formatTime(new Date(comment.createdAt).getTime())}
+              </TText>
+            )}
+          </View>
+          <TText size="sm" style={{ marginBottom: spacing.xs }}>
+            {comment.content}
+          </TText>
+
+          {/* Reply Button */}
+          <Pressable
+            onPress={() => setReplyingTo(comment.commentId)}
+            style={{ flexDirection: "row", alignItems: "center", gap: 4, marginTop: spacing.xs }}
+          >
+            <Ionicons name="chatbubble-outline" size={14} color={colors.text.muted} />
+            <TText dim size="xs">Reply</TText>
+          </Pressable>
+        </View>
+      </View>
+
+      {/* Replies Section */}
+      {hasReplies && (
+        <Pressable
+          onPress={() => handleToggleReplies(comment.commentId)}
+          style={{ marginTop: spacing.sm, marginLeft: 40, flexDirection: "row", alignItems: "center", gap: spacing.xs }}
+        >
+          <Ionicons
+            name={isExpanded ? "chevron-down" : "chevron-forward"}
+            size={14}
+            color={colors.text.muted}
+          />
+          <TText dim size="xs">
+            {isExpanded ? "Hide" : "Show"} {comment.replyCount} {comment.replyCount === 1 ? "reply" : "replies"}
+          </TText>
+        </Pressable>
+      )}
+
+      {/* Expanded Replies */}
+      {isExpanded && (
+        <View style={{ marginTop: spacing.sm, marginLeft: 40 }}>
+          {loadingReplies ? (
+            <ActivityIndicator size="small" color={colors.accent.primary} />
+          ) : commentReplies.length === 0 ? (
+            <TText dim size="xs">No replies yet</TText>
+          ) : (
+            commentReplies.map((reply) => (
+              <CommentItem
+                key={reply.commentId}
+                comment={reply}
+                replyingTo={replyingTo}
+                setReplyingTo={setReplyingTo}
+                replyText={replyText}
+                setReplyText={setReplyText}
+                handlePostReply={handlePostReply}
+                expandedReplies={expandedReplies}
+                handleToggleReplies={handleToggleReplies}
+                commentReplies={[]}
+                loadingReplies={false}
+                formatTime={formatTime}
+                colors={colors}
+                spacing={spacing}
+              />
+            ))
           )}
         </View>
       )}
