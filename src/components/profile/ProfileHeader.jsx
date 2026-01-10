@@ -1,5 +1,5 @@
-import React from "react";
-import { View, Pressable } from "react-native";
+import React, { useRef, useEffect } from "react";
+import { View, Pressable, Animated } from "react-native";
 import { useTheme } from "../../theme";
 import TText from "../TText";
 import Card from "../Card";
@@ -9,19 +9,73 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { getMediaFileUrl } from "../../services/fileStorageApi";
 import AuthenticatedImage from "../AuthenticatedImage";
 
-function RowAction({ icon, label, onPress }) {
+function RowAction({ icon, label, onPress, animated = false }) {
   const { colors } = useTheme();
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+  const previousLabel = useRef(label);
+
+  useEffect(() => {
+    // Animate when label changes (follow/unfollow state change)
+    if (animated && previousLabel.current !== label) {
+      // Scale down then back up
+      Animated.sequence([
+        Animated.timing(scaleAnim, {
+          toValue: 0.8,
+          duration: 150,
+          useNativeDriver: true,
+        }),
+        Animated.timing(scaleAnim, {
+          toValue: 1.1,
+          duration: 150,
+          useNativeDriver: true,
+        }),
+        Animated.spring(scaleAnim, {
+          toValue: 1,
+          friction: 3,
+          tension: 40,
+          useNativeDriver: true,
+        }),
+      ]).start();
+      previousLabel.current = label;
+    }
+  }, [label, animated, scaleAnim]);
+
+  const handlePress = () => {
+    if (animated) {
+      // Quick press animation
+      Animated.sequence([
+        Animated.timing(scaleAnim, {
+          toValue: 0.9,
+          duration: 100,
+          useNativeDriver: true,
+        }),
+        Animated.spring(scaleAnim, {
+          toValue: 1,
+          friction: 3,
+          tension: 40,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+    onPress?.();
+  };
+
+  const animatedStyle = animated ? { transform: [{ scale: scaleAnim }] } : {};
+
   return (
-    <Pressable onPress={onPress} style={{ alignItems: "center", flex: 1 }}>
-      <View
-        style={{
-          width: 44, height: 44, borderRadius: 999,
-          backgroundColor: colors.bg.layer2, borderWidth: 1, borderColor: colors.border,
-          alignItems: "center", justifyContent: "center",
-        }}
+    <Pressable onPress={handlePress} style={{ alignItems: "center", flex: 1 }}>
+      <Animated.View
+        style={[
+          {
+            width: 44, height: 44, borderRadius: 999,
+            backgroundColor: colors.bg.layer2, borderWidth: 1, borderColor: colors.border,
+            alignItems: "center", justifyContent: "center",
+          },
+          animatedStyle,
+        ]}
       >
         <Ionicons name={icon} size={22} color={colors.text.primary} />
-      </View>
+      </Animated.View>
       <TText size="sm" dim style={{ marginTop: 6 }}>{label}</TText>
     </Pressable>
   );
@@ -118,6 +172,7 @@ export default function ProfileHeader({
               icon={isFollowing ? "person-remove" : "person-add"}
               label={isFollowing ? "Unfollow" : "Follow"}
               onPress={onToggleFollow}
+              animated={true}
             />
             <RowAction
               icon={isBlocked ? "ban" : "hand-left"}

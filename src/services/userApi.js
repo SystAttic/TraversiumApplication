@@ -38,24 +38,12 @@ export async function getUser({ username, email }) {
 }
 
 /**
- * Get user by user ID
- * @param {number} userId - User ID
+ * Get user by firebase ID
+ * @param {string} firebaseId - Firebase ID
  * @returns {Promise<UserDto>}
  */
-export async function getUserById(userId) {
-  return http(`/rest/v1/users/${userId}`, { method: "GET" });
-}
-
-/**
- * Update user
- * @param {Object} userDto - UserDto object
- * @returns {Promise<UserDto>}
- */
-export async function updateUser(userDto) {
-  return http(`/rest/v1/users`, {
-    method: "PUT",
-    body: JSON.stringify(userDto),
-  });
+export async function getUserById(firebaseId) {
+  return http(`/rest/v1/users/${firebaseId}`, { method: "GET" });
 }
 
 /**

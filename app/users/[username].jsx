@@ -8,6 +8,8 @@ import { fetchUserByUsername, fetchTrips, fetchMe } from "../../src/data/api";
 import ProfileContent from "../../src/components/profile/ProfileContent";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { router } from "expo-router";
+import { followUser, unfollowUser, blockUser, unblockUser, getFollowing, getBlockedUsers } from "../../src/services/userApi";
+import ModalConfirm from "../../src/components/ModalConfirm";
 
 export default function VisitorProfile() {
   const { username } = useLocalSearchParams();
@@ -18,6 +20,8 @@ export default function VisitorProfile() {
   const [trips, setTrips] = useState(null);
   const [following, setFollowing] = useState(false);
   const [blocked, setBlocked] = useState(false);
+  const [showBlockModal, setShowBlockModal] = useState(false);
+  const [showUnblockModal, setShowUnblockModal] = useState(false);
 
   useEffect(() => {
     let m = true;
@@ -31,6 +35,31 @@ export default function VisitorProfile() {
         if (!m) return;
         setUser(u);
         setMe(current);
+        
+        // Check if current user is following or has blocked the profile user
+        if (current && u && current.firebaseId !== u.firebaseId && current.username) {
+          try {
+            const [followingList, blockedList] = await Promise.all([
+              getFollowing(current.username, 0, 100).catch(() => []),
+              getBlockedUsers(0, 100).catch(() => []),
+            ]);
+            
+            const isFollowingUser = followingList.some(
+              (followedUser) => followedUser.firebaseId === u.firebaseId || followedUser.username === u.username
+            );
+            const isBlockedUser = blockedList.some(
+              (blockedUser) => blockedUser.firebaseId === u.firebaseId || blockedUser.username === u.username
+            );
+            
+            if (!m) return;
+            setFollowing(isFollowingUser);
+            setBlocked(isBlockedUser);
+          } catch (error) {
+            console.error("Error checking follow/block status:", error);
+            // Continue with default values (false)
+          }
+        }
+        
         // Filter trips where user is owner or collaborator, and visibility is public (unless viewing own profile)
         const isOwnProfile = u && current && u.firebaseId === current.firebaseId;
         setTrips((all || []).filter((t) => {
@@ -54,8 +83,89 @@ export default function VisitorProfile() {
   const xp = user?.xp ?? 60;
   const nextXp = user?.nextXp ?? 150;
 
-  const onToggleFollow = () => setFollowing((f) => !f);
-  const onToggleBlock = () => setBlocked((b) => !b);
+  const onToggleFollow = async () => {
+    if (!user || !user.username) return;
+    
+    const wasFollowing = following;
+    // Optimistically update UI
+    setFollowing(!wasFollowing);
+    
+    try {
+      if (wasFollowing) {
+        await unfollowUser(user.username);
+      } else {
+        await followUser(user.username);
+      }
+    } catch (error) {
+      // Revert on error
+      setFollowing(wasFollowing);
+      console.error("Error toggling follow:", error);
+      Alert.alert(
+        "Error",
+        wasFollowing 
+          ? "Failed to unfollow user. Please try again." 
+          : "Failed to follow user. Please try again."
+      );
+    }
+  };
+
+  const onToggleBlock = () => {
+    if (!user || !user.username) return;
+    
+    // Show confirmation modal instead of directly blocking/unblocking
+    if (blocked) {
+      setShowUnblockModal(true);
+    } else {
+      setShowBlockModal(true);
+    }
+  };
+
+  const handleConfirmBlock = async () => {
+    if (!user || !user.username) return;
+    
+    setShowBlockModal(false);
+    const wasBlocked = blocked;
+    // Optimistically update UI
+    setBlocked(true);
+    
+    try {
+      await blockUser(user.username);
+      // If blocking, also unfollow if currently following
+      if (following) {
+        setFollowing(false);
+      }
+    } catch (error) {
+      // Revert on error
+      setBlocked(wasBlocked);
+      console.error("Error blocking user:", error);
+      Alert.alert(
+        "Error",
+        "Failed to block user. Please try again."
+      );
+    }
+  };
+
+  const handleConfirmUnblock = async () => {
+    if (!user || !user.username) return;
+    
+    setShowUnblockModal(false);
+    const wasBlocked = blocked;
+    // Optimistically update UI
+    setBlocked(false);
+    
+    try {
+      await unblockUser(user.username);
+    } catch (error) {
+      // Revert on error
+      setBlocked(wasBlocked);
+      console.error("Error unblocking user:", error);
+      Alert.alert(
+        "Error",
+        "Failed to unblock user. Please try again."
+      );
+    }
+  };
+
   const onReport = () => Alert.alert("Report", "Thanks—your report has been noted.");
 
   return (
@@ -81,6 +191,28 @@ export default function VisitorProfile() {
           nextXp={nextXp}
         />
       </ScrollView>
+
+      {/* Block Confirmation Modal */}
+      <ModalConfirm
+        visible={showBlockModal}
+        title="Block User?"
+        message={`Are you sure you want to block ${user?.displayName || user?.username || "this user"}? You won't be able to see their content or interact with them.`}
+        confirmText="Block"
+        cancelText="Cancel"
+        onConfirm={handleConfirmBlock}
+        onCancel={() => setShowBlockModal(false)}
+      />
+
+      {/* Unblock Confirmation Modal */}
+      <ModalConfirm
+        visible={showUnblockModal}
+        title="Unblock User?"
+        message={`Are you sure you want to unblock ${user?.displayName || user?.username || "this user"}? You'll be able to see their content and interact with them again.`}
+        confirmText="Unblock"
+        cancelText="Cancel"
+        onConfirm={handleConfirmUnblock}
+        onCancel={() => setShowUnblockModal(false)}
+      />
     </Screen>
   );
 }

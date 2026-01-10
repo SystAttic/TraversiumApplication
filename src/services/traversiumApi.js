@@ -2,6 +2,7 @@
 import { Platform } from "react-native";
 import { auth } from "./firebase";
 import * as SecureStore from "expo-secure-store";
+import { getTenantId } from "../utils/tenantStorage";
 
 const TOKEN_KEY = "traversium_token";
 
@@ -103,6 +104,12 @@ export async function http(path, opts = {}, serviceBase = USER_SERVICE_BASE) {
     if (token) {
       headers["Authorization"] = `Bearer ${token}`;
     }
+  }
+  
+  // Add X-Tenant-Id header for multitenancy support
+  const tenantId = await getTenantId();
+  if (tenantId) {
+    headers["X-Tenant-Id"] = tenantId;
   }
   
   const res = await fetch(`${serviceBase}${path}`, {

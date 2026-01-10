@@ -4,35 +4,19 @@ import { useLocalSearchParams, router } from "expo-router";
 import { getTripById } from "../../../../../../src/services/tripApi";
 import { getMediaFileUrl } from "../../../../../../src/services/fileStorageApi";
 import { auth } from "../../../../../../src/services/firebase";
-import { getLikeCount, getComments, likeMedia, unlikeMedia, createComment, getCommentReplies } from "../../../../../../src/services/socialApi";
+import { getLikeCount, getComments, likeMedia, unlikeMedia, createComment } from "../../../../../../src/services/socialApi";
 import { getUserById } from "../../../../../../src/services/userApi";
 import TText from "../../../../../../src/components/TText";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useTheme } from "../../../../../../src/theme";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { spacing, radii } from "../../../../../../src/theme/spacing";
+import { spacing } from "../../../../../../src/theme/spacing";
 import AuthenticatedImage from "../../../../../../src/components/AuthenticatedImage";
 import BottomSheet from "../../../../../../src/components/BottomSheet";
+import CommentsSection from "../../../../../../src/components/comments/CommentsSection";
 
 const UI_HIDE_AFTER = 2500;
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
-
-// Helper to format timestamp
-const formatTime = (timestamp) => {
-  if (!timestamp) return "";
-  const date = new Date(timestamp);
-  const now = new Date();
-  const diffMs = now - date;
-  const diffMins = Math.floor(diffMs / 60000);
-  const diffHours = Math.floor(diffMs / 3600000);
-  const diffDays = Math.floor(diffMs / 86400000);
-
-  if (diffMins < 1) return "Just now";
-  if (diffMins < 60) return `${diffMins}m ago`;
-  if (diffHours < 24) return `${diffHours}h ago`;
-  if (diffDays < 7) return `${diffDays}d ago`;
-  return date.toLocaleDateString();
-};
 
 export default function MediaViewer() {
   const { id, momentId, mediaId } = useLocalSearchParams();
@@ -52,7 +36,8 @@ export default function MediaViewer() {
   const [postingComment, setPostingComment] = useState(false);
   const [replyingTo, setReplyingTo] = useState(null);
   const [replyText, setReplyText] = useState("");
-  const [expandedReplies, setExpandedReplies] = useState(new Set());
+  const [mediaOwner, setMediaOwner] = useState(null);
+  const [loadingOwner, setLoadingOwner] = useState(false);
   const timer = useRef(null);
   const flatListRef = useRef(null);
   const indexRef = useRef(0);
@@ -241,6 +226,32 @@ export default function MediaViewer() {
     return () => { on = false; };
   }, [current?.id]);
 
+  // Load media owner information
+  useEffect(() => {
+    if (!current?.uploader) {
+      setMediaOwner(null);
+      return;
+    }
+
+    let on = true;
+    setLoadingOwner(true);
+
+    (async () => {
+      try {
+        const owner = await getUserById(current.uploader);
+        if (!on) return;
+        setMediaOwner(owner);
+      } catch (error) {
+        console.error("Failed to fetch media owner:", error);
+        if (on) setMediaOwner(null);
+      } finally {
+        if (on) setLoadingOwner(false);
+      }
+    })();
+
+    return () => { on = false; };
+  }, [current?.uploader]);
+
   const scheduleHide = () => {
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(() => setShowUI(false), UI_HIDE_AFTER);
@@ -422,24 +433,6 @@ export default function MediaViewer() {
     }
   };
 
-  // Toggle replies visibility
-  const toggleReplies = async (commentId) => {
-    const newExpanded = new Set(expandedReplies);
-    if (newExpanded.has(commentId)) {
-      newExpanded.delete(commentId);
-    } else {
-      newExpanded.add(commentId);
-      // Load replies if not already loaded
-      try {
-        const repliesData = await getCommentReplies(commentId, 0, 50);
-        // Update comment with replies (we'll need to store this in state)
-        // For now, just mark as expanded
-      } catch (error) {
-        console.error("Failed to load replies:", error);
-      }
-    }
-    setExpandedReplies(newExpanded);
-  };
 
   if (!current) {
     return <View style={{ flex: 1, backgroundColor: "black" }} />;
@@ -547,41 +540,70 @@ export default function MediaViewer() {
         </>
       )}
 
-      {/* bottom bar: likes/comments */}
+      {/* bottom bar: owner info (left) and likes/comments (right) */}
       {showUI && current && (
         <View style={{ 
           position: "absolute", 
+          left: spacing.md,
           right: spacing.md, 
           bottom: insets.bottom + spacing.md,
           flexDirection: "row",
           alignItems: "center",
+          justifyContent: "space-between",
           zIndex: 10,
         }}>
-          {/* Comments */}
-          <Pressable
-            onPress={() => setShowCommentsSheet(true)}
-            style={{ flexDirection: "row", alignItems: "center", marginRight: spacing.md }}
-          >
-            <Ionicons name="chatbubble-outline" size={18} color="#fff" />
-            <TText style={{ color: "#fff", fontSize: 14, fontWeight: "500", marginLeft: 4 }}>
-              {String(commentCount)}
-            </TText>
-          </Pressable>
-          
-          {/* Likes */}
-          <Pressable
-            onPress={handleLikeToggle}
-            style={{ flexDirection: "row", alignItems: "center" }}
-          >
-            <Ionicons 
-              name={isLiked ? "heart" : "heart-outline"} 
-              size={18} 
-              color={isLiked ? "#ff3040" : "#fff"} 
-            />
-            <TText style={{ color: "#fff", fontSize: 14, fontWeight: "500", marginLeft: 4 }}>
-              {String(likeCount)}
-            </TText>
-          </Pressable>
+          {/* Media Owner Info (Left) */}
+          <View style={{ flexDirection: "row", alignItems: "center", flex: 1, marginRight: spacing.md }}>
+            {loadingOwner ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : mediaOwner ? (
+              <>
+                <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: "rgba(255,255,255,0.2)", alignItems: "center", justifyContent: "center", overflow: "hidden", marginRight: spacing.xs }}>
+                  {mediaOwner.avatarPhotoReference ? (
+                    <AuthenticatedImage
+                      source={{ uri: getMediaFileUrl(mediaOwner.avatarPhotoReference) }}
+                      style={{ width: 28, height: 28, borderRadius: 14 }}
+                      resizeMode="cover"
+                    />
+                  ) : (
+                    <Ionicons name="person" size={16} color="#fff" />
+                  )}
+                </View>
+                <TText style={{ color: "#fff", fontSize: 13, fontWeight: "500" }} numberOfLines={1}>
+                  {mediaOwner.displayName || mediaOwner.username || "Unknown"}
+                </TText>
+              </>
+            ) : null}
+          </View>
+
+          {/* Comments and Likes (Right) */}
+          <View style={{ flexDirection: "row", alignItems: "center" }}>
+            {/* Comments */}
+            <Pressable
+              onPress={() => setShowCommentsSheet(true)}
+              style={{ flexDirection: "row", alignItems: "center", marginRight: spacing.md }}
+            >
+              <Ionicons name="chatbubble-outline" size={18} color="#fff" />
+              <TText style={{ color: "#fff", fontSize: 14, fontWeight: "500", marginLeft: 4 }}>
+                {String(commentCount)}
+              </TText>
+            </Pressable>
+            
+            {/* Likes */}
+            <Pressable
+              onPress={handleLikeToggle}
+              style={{ flexDirection: "row", alignItems: "center" }}
+            >
+              <Ionicons 
+                name={isLiked ? "heart" : "heart-outline"} 
+                size={18} 
+                color={isLiked ? "#ff3040" : "#fff"} 
+              />
+              <TText style={{ color: "#fff", fontSize: 14, fontWeight: "500", marginLeft: 4 }}>
+                {String(likeCount)}
+              </TText>
+            </Pressable>
+          </View>
         </View>
       )}
 
@@ -595,7 +617,7 @@ export default function MediaViewer() {
         }}
         maxHeight="90%"
       >
-        <CommentsView
+        <CommentsSection
           comments={comments}
           loadingComments={loadingComments}
           newCommentText={newCommentText}
@@ -607,315 +629,8 @@ export default function MediaViewer() {
           replyText={replyText}
           setReplyText={setReplyText}
           handlePostReply={handlePostReply}
-          expandedReplies={expandedReplies}
-          toggleReplies={toggleReplies}
-          formatTime={formatTime}
-          colors={colors}
-          spacing={spacing}
         />
       </BottomSheet>
-    </View>
-  );
-}
-
-// Comments View Component
-function CommentsView({
-  comments,
-  loadingComments,
-  newCommentText,
-  setNewCommentText,
-  postingComment,
-  handlePostComment,
-  replyingTo,
-  setReplyingTo,
-  replyText,
-  setReplyText,
-  handlePostReply,
-  expandedReplies,
-  toggleReplies,
-  formatTime,
-  colors,
-  spacing,
-}) {
-  const [commentReplies, setCommentReplies] = useState({});
-  const [loadingReplies, setLoadingReplies] = useState({});
-
-  const loadReplies = async (commentId) => {
-    if (commentReplies[commentId]) return; // Already loaded
-    
-    setLoadingReplies(prev => ({ ...prev, [commentId]: true }));
-    try {
-      const repliesData = await getCommentReplies(commentId, 0, 50);
-      setCommentReplies(prev => ({ ...prev, [commentId]: repliesData?.content || [] }));
-    } catch (error) {
-      console.error("Failed to load replies:", error);
-      setCommentReplies(prev => ({ ...prev, [commentId]: [] }));
-    } finally {
-      setLoadingReplies(prev => ({ ...prev, [commentId]: false }));
-    }
-  };
-
-  const handleToggleReplies = (commentId) => {
-    const newExpanded = new Set(expandedReplies);
-    if (newExpanded.has(commentId)) {
-      newExpanded.delete(commentId);
-    } else {
-      newExpanded.add(commentId);
-      loadReplies(commentId);
-    }
-    toggleReplies(commentId);
-  };
-
-  return (
-    <View style={{ flex: 1 }}>
-      {/* Header */}
-      <View style={{ paddingHorizontal: spacing.md, paddingBottom: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.border }}>
-        <TText weight="bold" style={{ fontSize: 18 }}>Comments</TText>
-      </View>
-
-      {/* Comments List */}
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: spacing.md }}>
-        {loadingComments ? (
-          <View style={{ alignItems: "center", padding: spacing.xl }}>
-            <ActivityIndicator size="large" color={colors.accent.primary} />
-          </View>
-        ) : comments.length === 0 ? (
-          <View style={{ alignItems: "center", padding: spacing.xl }}>
-            <TText dim>No comments yet. Be the first to comment!</TText>
-          </View>
-        ) : (
-          comments.map((comment) => (
-            <CommentItem
-              key={comment.commentId}
-              comment={comment}
-              replyingTo={replyingTo}
-              setReplyingTo={setReplyingTo}
-              replyText={replyText}
-              setReplyText={setReplyText}
-              handlePostReply={handlePostReply}
-              expandedReplies={expandedReplies}
-              handleToggleReplies={handleToggleReplies}
-              commentReplies={commentReplies[comment.commentId] || []}
-              loadingReplies={loadingReplies[comment.commentId]}
-              formatTime={formatTime}
-              colors={colors}
-              spacing={spacing}
-            />
-          ))
-        )}
-      </ScrollView>
-
-      {/* New Comment Input */}
-      {replyingTo ? (
-        <View style={{ padding: spacing.md, borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.bg.layer2 }}>
-          <View style={{ flexDirection: "row", alignItems: "center", marginBottom: spacing.sm }}>
-            <TText size="sm" dim>Replying to comment</TText>
-            <Pressable onPress={() => setReplyingTo(null)} style={{ marginLeft: "auto" }}>
-              <Ionicons name="close" size={20} color={colors.text.muted} />
-            </Pressable>
-          </View>
-          <View style={{ flexDirection: "row", gap: spacing.sm }}>
-            <TextInput
-              value={replyText}
-              onChangeText={setReplyText}
-              placeholder="Write a reply..."
-              placeholderTextColor={colors.text.muted}
-              multiline
-              style={{
-                flex: 1,
-                borderWidth: 1,
-                borderColor: colors.border,
-                borderRadius: radii.md,
-                paddingHorizontal: spacing.md,
-                paddingVertical: spacing.sm,
-                color: colors.text.primary,
-                backgroundColor: colors.bg.layer1,
-                maxHeight: 100,
-              }}
-            />
-            <Pressable
-              onPress={() => handlePostReply(replyingTo)}
-              disabled={!replyText.trim() || postingComment}
-              style={{
-                paddingHorizontal: spacing.md,
-                paddingVertical: spacing.sm,
-                borderRadius: radii.md,
-                backgroundColor: replyText.trim() && !postingComment ? colors.accent.primary : colors.bg.layer3,
-                justifyContent: "center",
-              }}
-            >
-              {postingComment ? (
-                <ActivityIndicator size="small" color="#fff" />
-              ) : (
-                <Ionicons name="send" size={20} color="#fff" />
-              )}
-            </Pressable>
-          </View>
-        </View>
-      ) : (
-        <View style={{ padding: spacing.md, borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.bg.layer2 }}>
-          <View style={{ flexDirection: "row", gap: spacing.sm }}>
-            <TextInput
-              value={newCommentText}
-              onChangeText={setNewCommentText}
-              placeholder="Write a comment..."
-              placeholderTextColor={colors.text.muted}
-              multiline
-              style={{
-                flex: 1,
-                borderWidth: 1,
-                borderColor: colors.border,
-                borderRadius: radii.md,
-                paddingHorizontal: spacing.md,
-                paddingVertical: spacing.sm,
-                color: colors.text.primary,
-                backgroundColor: colors.bg.layer1,
-                maxHeight: 100,
-              }}
-            />
-            <Pressable
-              onPress={handlePostComment}
-              disabled={!newCommentText.trim() || postingComment}
-              style={{
-                paddingHorizontal: spacing.md,
-                paddingVertical: spacing.sm,
-                borderRadius: radii.md,
-                backgroundColor: newCommentText.trim() && !postingComment ? colors.accent.primary : colors.bg.layer3,
-                justifyContent: "center",
-              }}
-            >
-              {postingComment ? (
-                <ActivityIndicator size="small" color="#fff" />
-              ) : (
-                <Ionicons name="send" size={20} color="#fff" />
-              )}
-            </Pressable>
-          </View>
-        </View>
-      )}
-    </View>
-  );
-}
-
-// Comment Item Component
-function CommentItem({
-  comment,
-  replyingTo,
-  setReplyingTo,
-  replyText,
-  setReplyText,
-  handlePostReply,
-  expandedReplies,
-  handleToggleReplies,
-  commentReplies,
-  loadingReplies,
-  formatTime,
-  colors,
-  spacing,
-}) {
-  const [commentUser, setCommentUser] = useState(null);
-
-  useEffect(() => {
-    if (comment.userId) {
-      getUserById(comment.userId)
-        .then(setCommentUser)
-        .catch(() => setCommentUser(null));
-    }
-  }, [comment.userId]);
-
-  const isExpanded = expandedReplies.has(comment.commentId);
-  const hasReplies = comment.replyCount > 0;
-
-  return (
-    <View style={{ marginBottom: spacing.md, paddingBottom: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.border }}>
-      {/* Comment Content */}
-      <View style={{ flexDirection: "row", gap: spacing.sm }}>
-        {/* Avatar */}
-        <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: colors.bg.layer3, alignItems: "center", justifyContent: "center" }}>
-          {commentUser?.avatarPhotoReference ? (
-            <AuthenticatedImage
-              source={{ uri: getMediaFileUrl(commentUser.avatarPhotoReference) }}
-              style={{ width: 32, height: 32, borderRadius: 16 }}
-              resizeMode="cover"
-            />
-          ) : (
-            <Ionicons name="person" size={20} color={colors.text.muted} />
-          )}
-        </View>
-
-        {/* Comment Text */}
-        <View style={{ flex: 1 }}>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.xs, marginBottom: 2 }}>
-            <TText weight="500" size="sm">
-              {commentUser?.displayName || commentUser?.username || "Unknown"}
-            </TText>
-            {comment.createdAt && (
-              <TText dim size="xs">
-                {formatTime(new Date(comment.createdAt).getTime())}
-              </TText>
-            )}
-          </View>
-          <TText size="sm" style={{ marginBottom: spacing.xs }}>
-            {comment.content}
-          </TText>
-
-          {/* Reply Button */}
-          <Pressable
-            onPress={() => setReplyingTo(comment.commentId)}
-            style={{ flexDirection: "row", alignItems: "center", gap: 4, marginTop: spacing.xs }}
-          >
-            <Ionicons name="chatbubble-outline" size={14} color={colors.text.muted} />
-            <TText dim size="xs">Reply</TText>
-          </Pressable>
-        </View>
-      </View>
-
-      {/* Replies Section */}
-      {hasReplies && (
-        <Pressable
-          onPress={() => handleToggleReplies(comment.commentId)}
-          style={{ marginTop: spacing.sm, marginLeft: 40, flexDirection: "row", alignItems: "center", gap: spacing.xs }}
-        >
-          <Ionicons
-            name={isExpanded ? "chevron-down" : "chevron-forward"}
-            size={14}
-            color={colors.text.muted}
-          />
-          <TText dim size="xs">
-            {isExpanded ? "Hide" : "Show"} {comment.replyCount} {comment.replyCount === 1 ? "reply" : "replies"}
-          </TText>
-        </Pressable>
-      )}
-
-      {/* Expanded Replies */}
-      {isExpanded && (
-        <View style={{ marginTop: spacing.sm, marginLeft: 40 }}>
-          {loadingReplies ? (
-            <ActivityIndicator size="small" color={colors.accent.primary} />
-          ) : commentReplies.length === 0 ? (
-            <TText dim size="xs">No replies yet</TText>
-          ) : (
-            commentReplies.map((reply) => (
-              <CommentItem
-                key={reply.commentId}
-                comment={reply}
-                replyingTo={replyingTo}
-                setReplyingTo={setReplyingTo}
-                replyText={replyText}
-                setReplyText={setReplyText}
-                handlePostReply={handlePostReply}
-                expandedReplies={expandedReplies}
-                handleToggleReplies={handleToggleReplies}
-                commentReplies={[]}
-                loadingReplies={false}
-                formatTime={formatTime}
-                colors={colors}
-                spacing={spacing}
-              />
-            ))
-          )}
-        </View>
-      )}
     </View>
   );
 }

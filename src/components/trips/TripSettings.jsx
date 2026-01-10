@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { View, ScrollView, Pressable, Alert, ActivityIndicator } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as ImagePicker from "expo-image-picker";
@@ -16,12 +16,18 @@ import { TRIP_BAR_BASE_HEIGHT } from "./TripBottomBar";
 import { uploadMediaFile } from "../../services/fileStorageApi";
 import { updateTrip, getTripById } from "../../services/tripApi";
 import { getMediaFileUrl } from "../../services/fileStorageApi";
+import { getUserById } from "../../services/userApi";
 import AuthenticatedImage from "../AuthenticatedImage";
 
 export default function TripSettings({ trip, onTripUpdate }) {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const canEdit = trip?.isCollaborator || trip?.ownerId === trip?.currentUserId;
+  
+  const [collaboratorsWithInfo, setCollaboratorsWithInfo] = useState([]);
+  const [viewersWithInfo, setViewersWithInfo] = useState([]);
+  const [loadingCollaborators, setLoadingCollaborators] = useState(false);
+  const [loadingViewers, setLoadingViewers] = useState(false);
 
   // Cover photo state
   const [coverPhoto, setCoverPhoto] = useState(null);
@@ -120,6 +126,112 @@ export default function TripSettings({ trip, onTripUpdate }) {
     setShowInviteSheet(false);
   };
 
+  // Fetch user information for collaborators
+  useEffect(() => {
+    const collaboratorIds = Array.isArray(trip?.collaborators) ? trip.collaborators : [];
+    if (collaboratorIds.length === 0) {
+      setCollaboratorsWithInfo([]);
+      return;
+    }
+
+    let on = true;
+    setLoadingCollaborators(true);
+
+    (async () => {
+      try {
+        const collaboratorPromises = collaboratorIds.map(async (item) => {
+          // Handle both cases: item might be a string (firebaseId) or an object with id property
+          const firebaseId = typeof item === 'string' ? item : (item?.id || item?.firebaseId);
+          if (!firebaseId) {
+            console.error('Invalid collaborator item:', item);
+            return null;
+          }
+          
+          try {
+            const user = await getUserById(firebaseId);
+            return {
+              id: firebaseId,
+              username: user.username || firebaseId,
+              displayName: user.displayName || user.username || firebaseId,
+              avatarPhotoReference: user.avatarPhotoReference,
+            };
+          } catch (error) {
+            console.error(`Failed to fetch collaborator ${firebaseId}:`, error);
+            return {
+              id: firebaseId,
+              username: firebaseId,
+              displayName: firebaseId,
+              avatarPhotoReference: null,
+            };
+          }
+        });
+
+        const collaborators = (await Promise.all(collaboratorPromises)).filter(Boolean);
+        if (on) setCollaboratorsWithInfo(collaborators);
+      } catch (error) {
+        console.error("Failed to fetch collaborators:", error);
+        if (on) setCollaboratorsWithInfo([]);
+      } finally {
+        if (on) setLoadingCollaborators(false);
+      }
+    })();
+
+    return () => { on = false; };
+  }, [trip?.collaborators]);
+
+  // Fetch user information for viewers
+  useEffect(() => {
+    const viewerIds = Array.isArray(trip?.viewers) ? trip.viewers : [];
+    if (viewerIds.length === 0) {
+      setViewersWithInfo([]);
+      return;
+    }
+
+    let on = true;
+    setLoadingViewers(true);
+
+    (async () => {
+      try {
+        const viewerPromises = viewerIds.map(async (item) => {
+          // Handle both cases: item might be a string (firebaseId) or an object with id property
+          const firebaseId = typeof item === 'string' ? item : (item?.id || item?.firebaseId);
+          if (!firebaseId) {
+            console.error('Invalid viewer item:', item);
+            return null;
+          }
+          
+          try {
+            const user = await getUserById(firebaseId);
+            return {
+              id: firebaseId,
+              username: user.username || firebaseId,
+              displayName: user.displayName || user.username || firebaseId,
+              avatarPhotoReference: user.avatarPhotoReference,
+            };
+          } catch (error) {
+            console.error(`Failed to fetch viewer ${firebaseId}:`, error);
+            return {
+              id: firebaseId,
+              username: firebaseId,
+              displayName: firebaseId,
+              avatarPhotoReference: null,
+            };
+          }
+        });
+
+        const viewers = (await Promise.all(viewerPromises)).filter(Boolean);
+        if (on) setViewersWithInfo(viewers);
+      } catch (error) {
+        console.error("Failed to fetch viewers:", error);
+        if (on) setViewersWithInfo([]);
+      } finally {
+        if (on) setLoadingViewers(false);
+      }
+    })();
+
+    return () => { on = false; };
+  }, [trip?.viewers]);
+
   const handleRemoveUser = (userId, role) => {
     Alert.alert(
       "Remove User",
@@ -138,8 +250,8 @@ export default function TripSettings({ trip, onTripUpdate }) {
     );
   };
 
-  const collaborators = Array.isArray(trip?.collaborators) ? trip.collaborators : [];
-  const viewers = Array.isArray(trip?.viewers) ? trip.viewers : [];
+  const collaborators = collaboratorsWithInfo;
+  const viewers = viewersWithInfo;
 
   return (
     <>
@@ -238,7 +350,11 @@ export default function TripSettings({ trip, onTripUpdate }) {
             )}
           </View>
 
-          {collaborators.length > 0 ? (
+          {loadingCollaborators ? (
+            <View style={{ alignItems: "center", padding: spacing.md }}>
+              <ActivityIndicator size="small" color={colors.accent.primary} />
+            </View>
+          ) : collaborators.length > 0 ? (
             <>
               <View style={{ marginBottom: spacing.md }}>
                 {collaborators.slice(0, 3).map((c, idx) => (
@@ -290,7 +406,11 @@ export default function TripSettings({ trip, onTripUpdate }) {
             )}
           </View>
 
-          {viewers.length > 0 ? (
+          {loadingViewers ? (
+            <View style={{ alignItems: "center", padding: spacing.md }}>
+              <ActivityIndicator size="small" color={colors.accent.primary} />
+            </View>
+          ) : viewers.length > 0 ? (
             <>
               <View style={{ marginBottom: spacing.md }}>
                 {viewers.slice(0, 3).map((v, idx) => (

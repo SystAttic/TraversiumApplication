@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import PageMiniHeader from "../../../src/components/PageMiniHeader";
 import { getTripById, removeCollaboratorFromTrip } from "../../../src/services/tripApi";
 import { auth } from "../../../src/services/firebase";
+import { getUserById } from "../../../src/services/userApi";
 import TText from "../../../src/components/TText";
 import Card from "../../../src/components/Card";
 import UserRow from "../../../src/components/users/UserRow";
@@ -40,12 +41,35 @@ export default function CollaboratorsScreen() {
         const isCollaborator = tripData.collaborators?.includes(currentUserId) || false;
         const isOwner = tripData.ownerId === currentUserId;
         
-        // Transform collaborators (for now just IDs, will need user API later)
-        const collaborators = tripData.collaborators?.map((firebaseId) => ({
-          id: firebaseId,
-          username: firebaseId, // Placeholder
-          displayName: firebaseId, // Placeholder
-        })) || [];
+        // Fetch user information for each collaborator
+        const collaboratorPromises = (tripData.collaborators || []).map(async (item) => {
+          // Handle both cases: item might be a string (firebaseId) or an object with id property
+          const firebaseId = typeof item === 'string' ? item : (item?.id || item?.firebaseId);
+          if (!firebaseId) {
+            console.error('Invalid collaborator item:', item);
+            return null;
+          }
+          
+          try {
+            const user = await getUserById(firebaseId);
+            return {
+              id: firebaseId,
+              username: user.username || firebaseId,
+              displayName: user.displayName || user.username || firebaseId,
+              avatarPhotoReference: user.avatarPhotoReference,
+            };
+          } catch (error) {
+            console.error(`Failed to fetch user ${firebaseId}:`, error);
+            return {
+              id: firebaseId,
+              username: firebaseId,
+              displayName: firebaseId,
+              avatarPhotoReference: null,
+            };
+          }
+        });
+        
+        const collaborators = (await Promise.all(collaboratorPromises)).filter(Boolean);
         
         const transformedTrip = {
           ...tripData,
@@ -104,11 +128,35 @@ export default function CollaboratorsScreen() {
               const isCollaborator = tripData.collaborators?.includes(currentUserId) || false;
               const isOwner = tripData.ownerId === currentUserId;
               
-              const collaborators = tripData.collaborators?.map((firebaseId) => ({
-                id: firebaseId,
-                username: firebaseId,
-                displayName: firebaseId,
-              })) || [];
+              // Fetch user information for each collaborator
+              const collaboratorPromises = (tripData.collaborators || []).map(async (item) => {
+                // Handle both cases: item might be a string (firebaseId) or an object with id property
+                const firebaseId = typeof item === 'string' ? item : (item?.id || item?.firebaseId);
+                if (!firebaseId) {
+                  console.error('Invalid collaborator item:', item);
+                  return null;
+                }
+                
+                try {
+                  const user = await getUserById(firebaseId);
+                  return {
+                    id: firebaseId,
+                    username: user.username || firebaseId,
+                    displayName: user.displayName || user.username || firebaseId,
+                    avatarPhotoReference: user.avatarPhotoReference,
+                  };
+                } catch (error) {
+                  console.error(`Failed to fetch user ${firebaseId}:`, error);
+                  return {
+                    id: firebaseId,
+                    username: firebaseId,
+                    displayName: firebaseId,
+                    avatarPhotoReference: null,
+                  };
+                }
+              });
+              
+              const collaborators = (await Promise.all(collaboratorPromises)).filter(Boolean);
               
               setTrip({
                 ...tripData,
@@ -174,17 +222,11 @@ export default function CollaboratorsScreen() {
           paddingBottom: TRIP_BAR_BASE_HEIGHT + insets.bottom + spacing.xl,
         }}
         renderItem={({ item: user }) => {
-          // Map user data to match UserRow expectations
-          const mappedUser = {
-            ...user,
-            avatarPhotoReference: user.avatar || user.avatarPhotoReference,
-          };
-          
           return (
             <View style={{ marginBottom: spacing.sm }}>
               <View style={{ flexDirection: "row", alignItems: "center" }}>
                 <View style={{ flex: 1, marginRight: spacing.sm }}>
-                  <UserRow user={mappedUser} rightKind="none" />
+                  <UserRow user={user} rightKind="none" />
                 </View>
                 {canEdit && user.id !== trip?.ownerId && (
                   <Pressable
