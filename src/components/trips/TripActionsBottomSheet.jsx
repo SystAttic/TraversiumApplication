@@ -61,7 +61,7 @@ export default function TripActionsBottomSheet({ visible, onClose, onCreateTrip,
 
         <ActionButton
           icon="qr-code"
-          label="Join trip by QR"
+          label="My QR Code"
           onPress={onJoinByQR}
         />
       </View>

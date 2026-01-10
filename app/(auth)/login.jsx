@@ -10,7 +10,7 @@ import TenantSelector from "../../src/components/auth/TenantSelector";
 import { LinearGradient } from "expo-linear-gradient";
 import {
   auth,
-  signInWithEmailAndPasswordForTenant,
+  signInWithEmailAndPassword,
 } from "../../src/services/firebase";
 import { saveFirebaseSession } from "../../src/auth/firebaseSession";
 import { getTenantId, setTenantId } from "../../src/utils/tenantStorage";
@@ -38,9 +38,10 @@ export default function LoginScreen() {
     if (!email || !password) { setError("Please enter email and password"); return; }
     try {
       setBusy(true);
-      // Save tenant ID before login
+      // Save tenant ID to storage (for API calls, not Firebase auth)
       await setTenantId(tenantId);
-      const cred = await signInWithEmailAndPasswordForTenant(tenantId, email.trim(), password);
+      // Always use default Firebase tenant for authentication
+      const cred = await signInWithEmailAndPassword(auth, email.trim(), password);
       await saveFirebaseSession(cred.user);
       router.replace("/");
     } catch (e) {

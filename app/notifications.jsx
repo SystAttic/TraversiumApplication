@@ -13,8 +13,8 @@ import { router } from "expo-router";
 import {
   fetchNotifications,
   clearAllNotifications,
-  markAllRead,
 } from "../src/data/notifications";
+import { useNotifications } from "../src/contexts/NotificationContext";
 
 const PAGE_SIZE = 10;
 const FOOTER_HEIGHT = 64; // visual height of the bottom bar (excluding safe-area)
@@ -22,6 +22,7 @@ const FOOTER_HEIGHT = 64; // visual height of the bottom bar (excluding safe-are
 export default function NotificationsScreen() {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
+  const { refreshCount } = useNotifications();
 
   const [items, setItems] = useState([]);
   const [page, setPage] = useState(0);
@@ -41,11 +42,15 @@ export default function NotificationsScreen() {
     setPage(targetPage);
     setLoading(false);
     setLoadingMore(false);
-  }, []);
+    
+    // Refresh count after loading notifications (especially after page 0 which marks them as seen)
+    if (isFirst) {
+      refreshCount().catch(() => {});
+    }
+  }, [refreshCount]);
 
   useEffect(() => {
     loadPage(0);
-    markAllRead().catch(() => {});
   }, [loadPage]);
 
   const onEndReached = async () => {

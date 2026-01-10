@@ -1,19 +1,30 @@
 import React, { useState, useEffect } from "react";
 import { View, StyleSheet, Alert, Pressable, ActivityIndicator } from "react-native";
-import { useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import Screen from "../../src/components/Screen";
 import AppHeader from "../../src/components/AppHeader";
 import TText from "../../src/components/TText";
+import ModalConfirm from "../../src/components/ModalConfirm";
 import { useTheme } from "../../src/theme";
 import { spacing } from "../../src/theme/spacing";
 import Ionicons from "@expo/vector-icons/Ionicons";
+import { getUser } from "../../src/services/userApi";
+import { addCollaboratorToTrip, addViewerToTrip } from "../../src/services/tripApi";
 
 export default function QRScannerScreen() {
   const { colors } = useTheme();
   const router = useRouter();
+  const params = useLocalSearchParams();
   const [permission, requestPermission] = useCameraPermissions();
   const [scanned, setScanned] = useState(false);
+  const [scannedUsername, setScannedUsername] = useState(null);
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [userInfo, setUserInfo] = useState(null);
+  const [adding, setAdding] = useState(false);
+  
+  const tripId = params.tripId ? Number(params.tripId) : null;
+  const role = params.role || "collaborator";
 
   useEffect(() => {
     if (permission && !permission.granted && !permission.canAskAgain) {
@@ -28,38 +39,80 @@ export default function QRScannerScreen() {
     }
   }, [permission]);
 
-  // QR Code format: JSON string with { tripId: number, role: "collaborator" | "viewer" }
-  const handleBarCodeScanned = ({ data }) => {
-    if (scanned) return; // Prevent multiple scans
+  // QR Code format: username string
+  const handleBarCodeScanned = async ({ data }) => {
+    if (scanned || !data) return; // Prevent multiple scans
     
     setScanned(true);
-    try {
-      const qrData = JSON.parse(data);
-      if (qrData.tripId && (qrData.role === "collaborator" || qrData.role === "viewer")) {
-        router.push({
-          pathname: "/trips/join",
-          params: {
-            tripId: String(qrData.tripId),
-            role: qrData.role,
-          },
-        });
-      } else {
-        Alert.alert(
-          "Invalid QR Code",
-          "This QR code is not a valid trip invitation.",
-          [
-            { text: "OK", onPress: () => setScanned(false) },
-          ]
-        );
-      }
-    } catch (err) {
+    const username = data.trim();
+    
+    if (!username) {
       Alert.alert(
         "Invalid QR Code",
-        "Could not read trip information from QR code.",
+        "Could not read username from QR code.",
         [
           { text: "OK", onPress: () => setScanned(false) },
         ]
       );
+      return;
+    }
+
+    try {
+      // Get user info to show in confirmation
+      const user = await getUser({ username });
+      if (!user || !user.firebaseId) {
+        Alert.alert(
+          "User Not Found",
+          `User with username "${username}" not found.`,
+          [
+            { text: "OK", onPress: () => setScanned(false) },
+          ]
+        );
+        return;
+      }
+
+      setScannedUsername(username);
+      setUserInfo(user);
+      setShowConfirm(true);
+    } catch (error) {
+      console.error("Failed to get user:", error);
+      Alert.alert(
+        "Error",
+        error?.message || "Failed to find user. Please try again.",
+        [
+          { text: "OK", onPress: () => setScanned(false) },
+        ]
+      );
+    }
+  };
+
+  const handleConfirmAdd = async () => {
+    if (!tripId || !userInfo || !userInfo.firebaseId) {
+      Alert.alert("Error", "Missing information");
+      return;
+    }
+
+    setAdding(true);
+    try {
+      if (role === "collaborator") {
+        await addCollaboratorToTrip(tripId, userInfo.firebaseId);
+      } else {
+        await addViewerToTrip(tripId, userInfo.firebaseId);
+      }
+
+      Alert.alert(
+        "Success",
+        `${userInfo.displayName || userInfo.username} has been added as a ${role}`,
+        [
+          { text: "OK", onPress: () => router.back() },
+        ]
+      );
+    } catch (error) {
+      console.error("Failed to add user:", error);
+      Alert.alert("Error", error?.message || "Failed to add user. Please try again.");
+      setAdding(false);
+      setShowConfirm(false);
+      setScanned(false);
     }
   };
 
@@ -168,7 +221,7 @@ export default function QRScannerScreen() {
               borderRadius: 8,
             }}
           >
-            Point your camera at a trip invitation QR code
+            Point your camera at a user's QR code
           </TText>
         </View>
 
@@ -190,6 +243,22 @@ export default function QRScannerScreen() {
           </View>
         )}
       </View>
+
+      {/* Confirmation Modal */}
+      <ModalConfirm
+        visible={showConfirm}
+        title={`Add as ${role === "collaborator" ? "Collaborator" : "Viewer"}?`}
+        message={`You are about to add @${scannedUsername} (${userInfo?.displayName || scannedUsername}) as ${role === "collaborator" ? "a collaborator" : "a viewer"}. Are you sure you want to do this?`}
+        confirmText={adding ? "Adding..." : "Yes, Add"}
+        cancelText="Cancel"
+        onConfirm={handleConfirmAdd}
+        onCancel={() => {
+          setShowConfirm(false);
+          setScannedUsername(null);
+          setUserInfo(null);
+          setScanned(false);
+        }}
+      />
     </Screen>
   );
 }

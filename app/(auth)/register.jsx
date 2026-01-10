@@ -13,7 +13,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import {
   auth,
-  createUserWithEmailAndPasswordForTenant,
+  createUserWithEmailAndPassword,
   updateProfile,
   deleteUser,
 } from "../../src/services/firebase";
@@ -219,11 +219,11 @@ export default function RegisterScreen() {
     try {
       setBusy(true);
 
-      // Save tenant ID before registration
+      // Save tenant ID to storage (for API calls, not Firebase auth)
       await setTenantId(tenantId);
 
-      // Step 1: Create user in Firebase
-      const cred = await createUserWithEmailAndPasswordForTenant(tenantId, email.trim(), password);
+      // Step 1: Create user in Firebase (always use default tenant)
+      const cred = await createUserWithEmailAndPassword(auth, email.trim(), password);
       firebaseUser = cred.user;
 
       // Step 2: Optional: set Firebase displayName for quick UX

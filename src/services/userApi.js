@@ -173,3 +173,14 @@ export async function searchUsersByUsername(query, offset = 0, limit = 20) {
   return http(`/rest/v1/users/search?query=${encodeURIComponent(query)}&offset=${offset}&limit=${limit}`, { method: "GET" });
 }
 
+/**
+ * Update current user
+ * @param {Object} userDto - UserDto object with updated fields
+ * @returns {Promise<UserDto>}
+ */
+export async function updateUser(userDto) {
+  return http(`/rest/v1/users`, {
+    method: "PUT",
+    body: JSON.stringify(userDto),
+  });
+}

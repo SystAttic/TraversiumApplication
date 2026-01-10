@@ -1,10 +1,12 @@
-import React, { useState, useEffect } from "react";
-import { View, Pressable, ScrollView, TextInput, Alert, ActivityIndicator } from "react-native";
+import React, { useState, useEffect, useRef, useCallback } from "react";
+import { View, Pressable, ScrollView, TextInput, Alert, ActivityIndicator, BackHandler } from "react-native";
 import Screen from "../../src/components/Screen";
 import AppHeader from "../../src/components/AppHeader";
 import Card from "../../src/components/Card";
 import TText from "../../src/components/TText";
 import Button from "../../src/components/Button";
+import Accordion from "../../src/components/Accordion";
+import ModalConfirm from "../../src/components/ModalConfirm";
 import { spacing, radii } from "../../src/theme/spacing";
 import { useTheme } from "../../src/theme";
 import { useTranslation } from "react-i18next";
@@ -16,6 +18,7 @@ import { updateUser } from "../../src/services/userApi";
 import { uploadMediaFile } from "../../src/services/fileStorageApi";
 import { getMediaFileUrl } from "../../src/services/fileStorageApi";
 import AuthenticatedImage from "../../src/components/AuthenticatedImage";
+import Ionicons from "@expo/vector-icons/Ionicons";
 
 export default function EditProfile() {
   const { colors } = useTheme();
@@ -26,6 +29,7 @@ export default function EditProfile() {
   const [saving, setSaving] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [uploadingCover, setUploadingCover] = useState(false);
+  const [showCancelModal, setShowCancelModal] = useState(false);
   
   const [user, setUser] = useState(null);
   const [displayName, setDisplayName] = useState("");
@@ -38,6 +42,30 @@ export default function EditProfile() {
   const [cover, setCover] = useState(null); // Selected cover image asset
   const [avatarPreview, setAvatarPreview] = useState(null); // Preview URI
   const [coverPreview, setCoverPreview] = useState(null); // Preview URI
+  
+  // Store initial values to detect changes
+  const initialValuesRef = useRef({
+    displayName: "",
+    username: "",
+    description: "",
+    password: "",
+    avatarPhotoReference: null,
+    coverPhotoReference: null,
+  });
+
+  // Check if there are unsaved changes
+  const hasUnsavedChanges = useCallback(() => {
+    if (!user) return false;
+    return (
+      displayName.trim() !== initialValuesRef.current.displayName ||
+      username.trim() !== initialValuesRef.current.username ||
+      description.trim() !== initialValuesRef.current.description ||
+      password !== "" ||
+      confirmPassword !== "" ||
+      avatar !== null ||
+      cover !== null
+    );
+  }, [user, displayName, username, description, password, confirmPassword, avatar, cover]);
 
   // Load user data
   useEffect(() => {
@@ -49,11 +77,25 @@ export default function EditProfile() {
         if (!mounted) return;
         
         setUser(userData);
-        setDisplayName(userData.displayName || "");
-        setUsername(userData.username || "");
-        setDescription(userData.description || "");
+        const initialDisplayName = userData.displayName || "";
+        const initialUsername = userData.username || "";
+        const initialDescription = userData.description || "";
+        
+        setDisplayName(initialDisplayName);
+        setUsername(initialUsername);
+        setDescription(initialDescription);
         setAvatarPreview(userData.avatarPhotoReference ? getMediaFileUrl(userData.avatarPhotoReference) : null);
         setCoverPreview(userData.coverPhotoReference ? getMediaFileUrl(userData.coverPhotoReference) : null);
+        
+        // Store initial values
+        initialValuesRef.current = {
+          displayName: initialDisplayName,
+          username: initialUsername,
+          description: initialDescription,
+          password: "",
+          avatarPhotoReference: userData.avatarPhotoReference,
+          coverPhotoReference: userData.coverPhotoReference,
+        };
       } catch (error) {
         console.error("Failed to load user:", error);
         Alert.alert("Error", "Failed to load profile data. Please try again.");
@@ -64,6 +106,19 @@ export default function EditProfile() {
     })();
     return () => { mounted = false; };
   }, []);
+
+  // Handle Android back button
+  useEffect(() => {
+    const backHandler = BackHandler.addEventListener("hardwareBackPress", () => {
+      if (hasUnsavedChanges()) {
+        setShowCancelModal(true);
+        return true; // Prevent default back behavior
+      }
+      return false; // Allow default back behavior
+    });
+
+    return () => backHandler.remove();
+  }, [hasUnsavedChanges]);
 
   const pickImage = async (type) => {
     try {
@@ -177,6 +232,22 @@ export default function EditProfile() {
 
       await updateUser(userDto);
 
+      // Reset initial values after successful save
+      initialValuesRef.current = {
+        displayName: displayName.trim(),
+        username: username.trim(),
+        description: description.trim() || "",
+        password: "",
+        avatarPhotoReference: avatarPhotoReference,
+        coverPhotoReference: coverPhotoReference,
+      };
+      
+      // Clear password fields and image selections
+      setPassword("");
+      setConfirmPassword("");
+      setAvatar(null);
+      setCover(null);
+
       Alert.alert("Success", "Profile updated successfully!", [
         { text: "OK", onPress: () => router.back() },
       ]);
@@ -189,6 +260,15 @@ export default function EditProfile() {
   };
 
   const handleCancel = () => {
+    if (hasUnsavedChanges()) {
+      setShowCancelModal(true);
+    } else {
+      router.back();
+    }
+  };
+
+  const handleConfirmCancel = () => {
+    setShowCancelModal(false);
     router.back();
   };
 
@@ -203,152 +283,270 @@ export default function EditProfile() {
     );
   }
 
+  // Header buttons
+  const headerButtons = (
+    <View style={{ flexDirection: "row", gap: spacing.sm, alignItems: "center" }}>
+      <Pressable
+        onPress={handleCancel}
+        disabled={saving || uploadingAvatar || uploadingCover}
+        hitSlop={10}
+        style={{
+          paddingHorizontal: spacing.sm,
+          paddingVertical: spacing.xs,
+        }}
+      >
+        <TText 
+          style={{ 
+            color: saving || uploadingAvatar || uploadingCover 
+              ? colors.text.muted 
+              : colors.text.primary 
+          }}
+          weight="medium"
+        >
+          {t("cancel", { defaultValue: "Cancel" })}
+        </TText>
+      </Pressable>
+      <Pressable
+        onPress={handleSave}
+        disabled={saving || uploadingAvatar || uploadingCover || !hasUnsavedChanges()}
+        hitSlop={10}
+        style={{
+          paddingHorizontal: spacing.sm,
+          paddingVertical: spacing.xs,
+          opacity: saving || uploadingAvatar || uploadingCover || !hasUnsavedChanges() ? 0.5 : 1,
+        }}
+      >
+        <TText 
+          style={{ color: colors.accent.primary }}
+          weight="bold"
+        >
+          {saving ? t("saving", { defaultValue: "Saving..." }) : t("save", { defaultValue: "Save" })}
+        </TText>
+      </Pressable>
+    </View>
+  );
+
   return (
     <Screen>
-      <AppHeader title={t("settings.editProfile", { defaultValue: "Edit Profile" })} />
+      <AppHeader 
+        title={t("settings.editProfile", { defaultValue: "Edit Profile" })} 
+        showBell={false}
+        rightElement={headerButtons}
+      />
       <ScrollView 
         contentContainerStyle={{ 
           padding: spacing.xl, 
-          gap: spacing.lg, 
           paddingBottom: insets.bottom + spacing.xl 
         }}
       >
-        {/* Cover & avatar */}
-        <Card style={{ padding: 0, overflow: "hidden" }}>
-          <Pressable 
-            onPress={() => pickImage("cover")}
-            disabled={uploadingCover}
-          >
-            {uploadingCover ? (
-              <View style={{ width: "100%", height: 140, justifyContent: "center", alignItems: "center", backgroundColor: colors.bg.layer2 }}>
-                <ActivityIndicator size="large" color={colors.accent.primary} />
-                <TText dim style={{ marginTop: spacing.sm }}>Uploading cover...</TText>
-              </View>
-            ) : (
-              <AuthenticatedImage 
-                source={coverPreview 
-                  ? { uri: coverPreview } 
-                  : require("../../assets/cover-default.jpg")
-                } 
-                style={{ width: "100%", height: 140 }} 
-                resizeMode="cover"
-              />
-            )}
-          </Pressable>
-          <View style={{ alignItems: "center" }}>
+        {/* Cover & Avatar Accordion */}
+        <Accordion 
+          title={t("profile.photos", { defaultValue: "Photos" })}
+          icon="images-outline"
+          defaultExpanded={true}
+        >
+          <Card style={{ padding: 0, overflow: "hidden", marginTop: spacing.md }}>
             <Pressable 
-              onPress={() => pickImage("avatar")}
-              disabled={uploadingAvatar}
+              onPress={() => pickImage("cover")}
+              disabled={uploadingCover}
             >
-              {uploadingAvatar ? (
-                <View style={{
-                  width: 96, height: 96, borderRadius: 999, marginTop: -40,
-                  borderWidth: 3, borderColor: colors.bg.layer1,
-                  backgroundColor: colors.bg.layer2,
-                  justifyContent: "center", alignItems: "center",
+              {uploadingCover ? (
+                <View style={{ 
+                  width: "100%", 
+                  height: 160, 
+                  justifyContent: "center", 
+                  alignItems: "center", 
+                  backgroundColor: colors.bg.layer3 
                 }}>
-                  <ActivityIndicator size="small" color={colors.accent.primary} />
+                  <ActivityIndicator size="large" color={colors.accent.primary} />
+                  <TText dim style={{ marginTop: spacing.sm }}>
+                    {t("uploadingCover", { defaultValue: "Uploading cover..." })}
+                  </TText>
                 </View>
               ) : (
-                <AuthenticatedImage
-                  source={avatarPreview 
-                    ? { uri: avatarPreview } 
-                    : require("../../assets/profile-default.jpg")
-                  }
-                  style={{
-                    width: 96, height: 96, borderRadius: 999, marginTop: -40,
-                    borderWidth: 3, borderColor: colors.bg.layer1,
-                  }}
-                  resizeMode="cover"
-                />
+                <View>
+                  <AuthenticatedImage 
+                    source={coverPreview 
+                      ? { uri: coverPreview } 
+                      : require("../../assets/cover-default.jpg")
+                    } 
+                    style={{ width: "100%", height: 160 }} 
+                    resizeMode="cover"
+                  />
+                  <View style={{
+                    position: "absolute",
+                    top: spacing.md,
+                    right: spacing.md,
+                    backgroundColor: colors.overlay || "rgba(0,0,0,0.5)",
+                    borderRadius: radii.pill,
+                    padding: spacing.sm,
+                  }}>
+                    <Ionicons name="camera" size={16} color="#fff" />
+                  </View>
+                </View>
               )}
             </Pressable>
-          </View>
-          <View style={{ padding: spacing.lg }}>
-            <TText dim>{t("tapToChange", { defaultValue: "Tap cover or avatar to change" })}</TText>
-          </View>
-        </Card>
-
-        {/* Read-only fields */}
-        <Card>
-          <TText weight="bold" size="md" style={{ marginBottom: spacing.sm }}>
-            {t("profile.readonly", { defaultValue: "Profile (read-only)" })}
-          </TText>
-          {[
-            ["First name", user?.firstName || "—"],
-            ["Last name", user?.lastName || "—"],
-            ["Email", user?.email || "—"],
-            ["Country of origin", user?.countryOfOrigin || "—"],
-            ["Gender", user?.gender || "—"],
-          ].map(([label, val], i) => (
-            <View key={i} style={{ marginBottom: spacing.sm }}>
-              <TText dim size="sm">{label}</TText>
-              <TText>{val}</TText>
+            <View style={{ alignItems: "center", marginTop: -48 }}>
+              <Pressable 
+                onPress={() => pickImage("avatar")}
+                disabled={uploadingAvatar}
+                style={{
+                  shadowColor: "#000",
+                  shadowOffset: { width: 0, height: 2 },
+                  shadowOpacity: 0.25,
+                  shadowRadius: 3.84,
+                  elevation: 5,
+                }}
+              >
+                {uploadingAvatar ? (
+                  <View style={{
+                    width: 96, 
+                    height: 96, 
+                    borderRadius: 999, 
+                    borderWidth: 4, 
+                    borderColor: colors.bg.layer1,
+                    backgroundColor: colors.bg.layer2,
+                    justifyContent: "center", 
+                    alignItems: "center",
+                  }}>
+                    <ActivityIndicator size="small" color={colors.accent.primary} />
+                  </View>
+                ) : (
+                  <View>
+                    <AuthenticatedImage
+                      source={avatarPreview 
+                        ? { uri: avatarPreview } 
+                        : require("../../assets/profile-default.jpg")
+                      }
+                      style={{
+                        width: 96, 
+                        height: 96, 
+                        borderRadius: 999, 
+                        borderWidth: 4, 
+                        borderColor: colors.bg.layer1,
+                      }}
+                      resizeMode="cover"
+                    />
+                    <View style={{
+                      position: "absolute",
+                      bottom: 0,
+                      right: 0,
+                      backgroundColor: colors.accent.primary,
+                      borderRadius: 999,
+                      padding: spacing.xs,
+                      borderWidth: 2,
+                      borderColor: colors.bg.layer1,
+                    }}>
+                      <Ionicons name="camera" size={14} color="#fff" />
+                    </View>
+                  </View>
+                )}
+              </Pressable>
             </View>
-          ))}
-        </Card>
+            <View style={{ padding: spacing.lg, paddingTop: spacing.xl + 8, alignItems: "center" }}>
+              <TText dim size="sm" style={{ textAlign: "center" }}>
+                {t("tapToChange", { defaultValue: "Tap cover or avatar to change" })}
+              </TText>
+            </View>
+          </Card>
+        </Accordion>
 
-        {/* Editable fields */}
-        <Card>
-          <TText weight="bold" size="md" style={{ marginBottom: spacing.sm }}>
-            {t("profile.editable", { defaultValue: "Editable" })}
-          </TText>
-
-          <LabeledInput 
-            label="Display Name" 
-            value={displayName} 
-            onChangeText={setDisplayName}
-            placeholder="Enter display name"
-          />
-          <LabeledInput 
-            label="Username" 
-            value={username} 
-            onChangeText={setUsername}
-            placeholder="Enter username"
-          />
-          <LabeledTextArea 
-            label="Profile Description" 
-            value={description} 
-            onChangeText={setDescription}
-            placeholder="Tell us about yourself..."
-          />
-
-          <View style={{ height: spacing.md }} />
-          <TText weight="medium" size="sm" style={{ marginBottom: spacing.sm }}>
-            Change Password (optional)
-          </TText>
-          <LabeledInput 
-            label="New Password" 
-            value={password} 
-            onChangeText={setPassword} 
-            secureTextEntry
-            placeholder="Leave empty to keep current password"
-          />
-          <LabeledInput 
-            label="Confirm Password" 
-            value={confirmPassword} 
-            onChangeText={setConfirmPassword} 
-            secureTextEntry
-            placeholder="Confirm new password"
-          />
-
-          <View style={{ flexDirection: "row", gap: spacing.sm, marginTop: spacing.md }}>
-            <Button 
-              title={t("save", { defaultValue: "Save" })} 
-              onPress={handleSave}
-              disabled={saving || uploadingAvatar || uploadingCover}
-              style={{ flex: 1 }}
+        {/* Editable Fields Accordion */}
+        <Accordion 
+          title={t("profile.editable", { defaultValue: "Editable Information" })}
+          icon="create-outline"
+          defaultExpanded={true}
+        >
+          <View style={{ marginTop: spacing.md }}>
+            <LabeledInput 
+              label={t("profile.displayName", { defaultValue: "Display Name" })} 
+              value={displayName} 
+              onChangeText={setDisplayName}
+              placeholder={t("profile.displayNamePlaceholder", { defaultValue: "Enter display name" })}
             />
-            <Button 
-              title={t("cancel", { defaultValue: "Cancel" })} 
-              variant="outline" 
-              onPress={handleCancel}
-              disabled={saving || uploadingAvatar || uploadingCover}
-              style={{ flex: 1 }}
+            <LabeledInput 
+              label={t("profile.username", { defaultValue: "Username" })} 
+              value={username} 
+              onChangeText={setUsername}
+              placeholder={t("profile.usernamePlaceholder", { defaultValue: "Enter username" })}
             />
+            <LabeledTextArea 
+              label={t("profile.description", { defaultValue: "Profile Description" })} 
+              value={description} 
+              onChangeText={setDescription}
+              placeholder={t("profile.descriptionPlaceholder", { defaultValue: "Tell us about yourself..." })}
+            />
+
+            <View style={{ 
+              marginTop: spacing.lg, 
+              paddingTop: spacing.lg, 
+              borderTopWidth: 1, 
+              borderTopColor: colors.border 
+            }}>
+              <TText weight="medium" size="sm" style={{ marginBottom: spacing.md }}>
+                {t("profile.changePassword", { defaultValue: "Change Password (optional)" })}
+              </TText>
+              <LabeledInput 
+                label={t("profile.newPassword", { defaultValue: "New Password" })} 
+                value={password} 
+                onChangeText={setPassword} 
+                secureTextEntry
+                placeholder={t("profile.newPasswordPlaceholder", { defaultValue: "Leave empty to keep current password" })}
+              />
+              <LabeledInput 
+                label={t("profile.confirmPassword", { defaultValue: "Confirm Password" })} 
+                value={confirmPassword} 
+                onChangeText={setConfirmPassword} 
+                secureTextEntry
+                placeholder={t("profile.confirmPasswordPlaceholder", { defaultValue: "Confirm new password" })}
+              />
+            </View>
           </View>
-        </Card>
+        </Accordion>
+
+        {/* Read-only Fields Accordion */}
+        <Accordion 
+          title={t("profile.readonly", { defaultValue: "Profile Information (Read-only)" })}
+          icon="information-circle-outline"
+          defaultExpanded={false}
+        >
+          <View style={{ marginTop: spacing.md }}>
+            {[
+              [t("profile.firstName", { defaultValue: "First name" }), user?.firstName || "—"],
+              [t("profile.lastName", { defaultValue: "Last name" }), user?.lastName || "—"],
+              [t("profile.email", { defaultValue: "Email" }), user?.email || "—"],
+              [t("profile.countryOfOrigin", { defaultValue: "Country of origin" }), user?.countryOfOrigin || "—"],
+              [t("profile.gender", { defaultValue: "Gender" }), user?.gender || "—"],
+            ].map(([label, val], i) => (
+              <View 
+                key={i} 
+                style={{ 
+                  marginBottom: spacing.md,
+                  paddingBottom: spacing.md,
+                  borderBottomWidth: i < 4 ? 1 : 0,
+                  borderBottomColor: colors.border,
+                }}
+              >
+                <TText dim size="sm" style={{ marginBottom: spacing.xs }}>{label}</TText>
+                <TText weight="medium">{val}</TText>
+              </View>
+            ))}
+          </View>
+        </Accordion>
       </ScrollView>
+
+      {/* Cancel Confirmation Modal */}
+      <ModalConfirm
+        visible={showCancelModal}
+        title={t("profile.cancelEditing", { defaultValue: "Cancel Editing Profile?" })}
+        message={t("profile.cancelMessage", { 
+          defaultValue: "Are you sure you want to cancel editing profile? New changes will not be saved unless pressed Save." 
+        })}
+        confirmText={t("yesCancel", { defaultValue: "Yes, Cancel" })}
+        cancelText={t("continueEditing", { defaultValue: "Continue Editing" })}
+        onConfirm={handleConfirmCancel}
+        onCancel={() => setShowCancelModal(false)}
+      />
     </Screen>
   );
 }

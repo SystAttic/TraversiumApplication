@@ -7,6 +7,7 @@ import { View } from "react-native";
 import { ThemeProvider, useTheme } from "../src/theme";
 import { LoadingProvider } from "../src/providers/LoadingProvider";
 import { LocaleProvider } from "../src/providers/LocaleProvider";
+import { NotificationProvider } from "../src/contexts/NotificationContext";
 
 function ThemedStack() {
   const { colors } = useTheme();
@@ -49,7 +50,9 @@ export default function RootLayout() {
     <ThemeProvider>
       <LocaleProvider>
         <LoadingProvider>
-          <ThemedStack />
+          <NotificationProvider>
+            <ThemedStack />
+          </NotificationProvider>
         </LoadingProvider>
       </LocaleProvider>
     </ThemeProvider>

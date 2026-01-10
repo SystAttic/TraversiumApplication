@@ -124,6 +124,11 @@ export default function SettingsScreen() {
               onPress={() => router.push("/settings/edit-profile")}
             />
             <Row
+              icon="qr-code"
+              title={t("settings.myQRCode", { defaultValue: "Show My QR Code" })}
+              onPress={() => router.push("/settings/my-qr-code")}
+            />
+            <Row
               icon="card"
               title={t("settings.payments", { defaultValue: "Payments and Subscriptions" })}
               onPress={() => router.push("/settings/payments")}

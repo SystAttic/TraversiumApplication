@@ -14,9 +14,9 @@ import UserRow from "../users/UserRow";
 import { router } from "expo-router";
 import { TRIP_BAR_BASE_HEIGHT } from "./TripBottomBar";
 import { uploadMediaFile } from "../../services/fileStorageApi";
-import { updateTrip, getTripById } from "../../services/tripApi";
+import { updateTrip, getTripById, addCollaboratorToTrip, addViewerToTrip } from "../../services/tripApi";
 import { getMediaFileUrl } from "../../services/fileStorageApi";
-import { getUserById } from "../../services/userApi";
+import { getUserById, getUser } from "../../services/userApi";
 import AuthenticatedImage from "../AuthenticatedImage";
 
 export default function TripSettings({ trip, onTripUpdate }) {
@@ -33,11 +33,12 @@ export default function TripSettings({ trip, onTripUpdate }) {
   const [coverPhoto, setCoverPhoto] = useState(null);
   const [uploadingCover, setUploadingCover] = useState(false);
 
-  // Invite management
-  const [showInviteSheet, setShowInviteSheet] = useState(false);
-  const [inviteMethod, setInviteMethod] = useState(null); // "username" | "email" | "qr"
-  const [inviteValue, setInviteValue] = useState("");
-  const [inviteRole, setInviteRole] = useState(null); // "collaborator" | "viewer" | null
+  // Add user management
+  const [showAddSheet, setShowAddSheet] = useState(false);
+  const [addMethod, setAddMethod] = useState(null); // "username" | "email" | "qr"
+  const [addValue, setAddValue] = useState("");
+  const [addRole, setAddRole] = useState(null); // "collaborator" | "viewer" | null
+  const [adding, setAdding] = useState(false);
 
   const handlePickImage = async () => {
     if (!canEdit) {
@@ -114,17 +115,61 @@ export default function TripSettings({ trip, onTripUpdate }) {
     }
   };
 
-  const handleInvite = (role) => {
-    if (!inviteValue.trim()) {
-      Alert.alert("Error", `Please enter ${inviteMethod === "username" ? "a username" : inviteMethod === "email" ? "an email address" : "QR code"}`);
+  const handleAddUser = async () => {
+    if (!addValue.trim()) {
+      Alert.alert("Error", `Please enter ${addMethod === "username" ? "a username" : "an email address"}`);
       return;
     }
-    // TODO: Call API to invite user
-    Alert.alert("Invite Sent", `Invitation sent to ${inviteValue} as ${role}`);
-    setInviteValue("");
-    setInviteMethod(null);
-    setShowInviteSheet(false);
+
+    if (!trip?.tripId && !trip?.id) {
+      Alert.alert("Error", "Trip ID not found");
+      return;
+    }
+
+    setAdding(true);
+    try {
+      // Get user by username or email
+      const user = await getUser(
+        addMethod === "username" 
+          ? { username: addValue.trim() } 
+          : { email: addValue.trim() }
+      );
+
+      if (!user || !user.firebaseId) {
+        Alert.alert("Error", "User not found");
+        return;
+      }
+
+      const tripId = Number(trip.tripId || trip.id);
+      
+      // Add user to trip
+      if (addRole === "collaborator") {
+        await addCollaboratorToTrip(tripId, user.firebaseId);
+      } else {
+        await addViewerToTrip(tripId, user.firebaseId);
+      }
+
+      Alert.alert("Success", `${user.displayName || user.username} has been added as a ${addRole}`);
+      
+      // Refresh trip data
+      if (onTripUpdate) {
+        const updatedTrip = await getTripById(tripId);
+        onTripUpdate(updatedTrip);
+      }
+
+      // Reset form
+      setAddValue("");
+      setAddMethod(null);
+      setAddRole(null);
+      setShowAddSheet(false);
+    } catch (error) {
+      console.error("Failed to add user:", error);
+      Alert.alert("Error", error?.message || "Failed to add user. Please try again.");
+    } finally {
+      setAdding(false);
+    }
   };
+
 
   // Fetch user information for collaborators
   useEffect(() => {
@@ -337,15 +382,15 @@ export default function TripSettings({ trip, onTripUpdate }) {
             {canEdit && (
               <Pressable 
                 onPress={() => {
-                  setInviteMethod(null);
-                  setInviteValue("");
-                  setInviteRole("collaborator");
-                  setShowInviteSheet(true);
+                  setAddMethod(null);
+                  setAddValue("");
+                  setAddRole("collaborator");
+                  setShowAddSheet(true);
                 }}
                 style={{ flexDirection: "row", alignItems: "center" }}
               >
                 <Ionicons name="person-add-outline" size={18} color={colors.accent.primary} style={{ marginRight: spacing.xs }} />
-                <TText size="sm" style={{ color: colors.accent.primary }}>Invite</TText>
+                <TText size="sm" style={{ color: colors.accent.primary }}>Add</TText>
               </Pressable>
             )}
           </View>
@@ -393,15 +438,15 @@ export default function TripSettings({ trip, onTripUpdate }) {
             {canEdit && (
               <Pressable 
                 onPress={() => {
-                  setInviteMethod(null);
-                  setInviteValue("");
-                  setInviteRole("viewer");
-                  setShowInviteSheet(true);
+                  setAddMethod(null);
+                  setAddValue("");
+                  setAddRole("viewer");
+                  setShowAddSheet(true);
                 }}
                 style={{ flexDirection: "row", alignItems: "center" }}
               >
                 <Ionicons name="person-add-outline" size={18} color={colors.accent.primary} style={{ marginRight: spacing.xs }} />
-                <TText size="sm" style={{ color: colors.accent.primary }}>Invite</TText>
+                <TText size="sm" style={{ color: colors.accent.primary }}>Add</TText>
               </Pressable>
             )}
           </View>
@@ -451,43 +496,46 @@ export default function TripSettings({ trip, onTripUpdate }) {
         )}
       </ScrollView>
 
-      {/* Invite User Bottom Sheet */}
-      <BottomSheet visible={showInviteSheet} onClose={() => {
-        setShowInviteSheet(false);
-        setInviteMethod(null);
-        setInviteValue("");
-        setInviteRole(null);
+      {/* Add User Bottom Sheet */}
+      <BottomSheet visible={showAddSheet} onClose={() => {
+        setShowAddSheet(false);
+        setAddMethod(null);
+        setAddValue("");
+        setAddRole(null);
       }} maxHeight="60%">
         <View style={{ paddingHorizontal: spacing.xl, paddingTop: spacing.md }}>
           <TText weight="bold" size="lg" style={{ marginBottom: spacing.lg }}>
-            Invite User
+            Add {addRole === "collaborator" ? "Collaborator" : "Viewer"}
           </TText>
 
-          {!inviteMethod ? (
+          {!addMethod ? (
             <>
               <TText dim size="sm" style={{ marginBottom: spacing.md }}>
-                Choose how you want to invite:
+                Choose how you want to add:
               </TText>
               <Button
-                title="Invite by Username"
-                onPress={() => setInviteMethod("username")}
+                title="Add by Username"
+                onPress={() => setAddMethod("username")}
                 style={{ marginBottom: spacing.sm }}
                 left={<Ionicons name="person-outline" size={20} color="#fff" />}
               />
               <Button
-                title="Invite by Email"
-                onPress={() => setInviteMethod("email")}
+                title="Add by Email"
+                onPress={() => setAddMethod("email")}
                 style={{ marginBottom: spacing.sm }}
                 left={<Ionicons name="mail-outline" size={20} color="#fff" />}
               />
               <Button
-                title="Invite by QR Code"
+                title="Add by QR Code"
                 variant="outline"
                 onPress={() => {
-                  setShowInviteSheet(false);
+                  setShowAddSheet(false);
                   router.push({
-                    pathname: `/trips/${trip?.id}/qr-invite`,
-                    params: { role: inviteRole || "collaborator" },
+                    pathname: "/trips/qr-scanner",
+                    params: { 
+                      tripId: String(trip?.tripId || trip?.id),
+                      role: addRole || "collaborator",
+                    },
                   });
                 }}
                 left={<Ionicons name="qr-code-outline" size={20} color={colors.accent.primary} />}
@@ -496,35 +544,30 @@ export default function TripSettings({ trip, onTripUpdate }) {
           ) : (
             <>
               <Input
-                label={inviteMethod === "username" ? "Username" : "Email Address"}
-                value={inviteValue}
-                onChangeText={setInviteValue}
-                placeholder={inviteMethod === "username" ? "@username" : "user@example.com"}
-                keyboardType={inviteMethod === "email" ? "email-address" : "default"}
+                label={addMethod === "username" ? "Username" : "Email Address"}
+                value={addValue}
+                onChangeText={setAddValue}
+                placeholder={addMethod === "username" ? "@username" : "user@example.com"}
+                keyboardType={addMethod === "email" ? "email-address" : "default"}
                 autoCapitalize="none"
               />
 
               <View style={{ marginTop: spacing.md }}>
-                {inviteRole === "collaborator" ? (
-                  <Button
-                    title="Invite as Collaborator"
-                    onPress={() => handleInvite("collaborator")}
-                    style={{ marginBottom: spacing.sm }}
-                  />
-                ) : inviteRole === "viewer" ? (
-                  <Button
-                    title="Invite as Viewer"
-                    onPress={() => handleInvite("viewer")}
-                    style={{ marginBottom: spacing.sm }}
-                  />
-                ) : null}
+                <Button
+                  title={adding ? "Adding..." : `Add as ${addRole === "collaborator" ? "Collaborator" : "Viewer"}`}
+                  onPress={handleAddUser}
+                  style={{ marginBottom: spacing.sm }}
+                  loading={adding}
+                  disabled={adding}
+                />
                 <Button
                   title="Back"
                   variant="ghost"
                   onPress={() => {
-                    setInviteMethod(null);
-                    setInviteValue("");
+                    setAddMethod(null);
+                    setAddValue("");
                   }}
+                  disabled={adding}
                 />
               </View>
             </>

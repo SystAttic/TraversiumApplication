@@ -188,8 +188,8 @@ export default function TripsList() {
     router.push("/trips/create");
   };
 
-  const handleJoinByQR = () => {
-    router.push("/trips/qr-scanner");
+  const handleShowMyQR = () => {
+    router.push("/settings/my-qr-code");
   };
 
   return (
@@ -323,7 +323,7 @@ export default function TripsList() {
         visible={showActionsSheet}
         onClose={() => setShowActionsSheet(false)}
         onCreateTrip={handleCreateTrip}
-        onJoinByQR={handleJoinByQR}
+        onJoinByQR={handleShowMyQR}
       />
     </Screen>
   );
