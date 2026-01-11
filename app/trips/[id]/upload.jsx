@@ -242,17 +242,8 @@ export default function UploadMediaScreen() {
   };
 
   const handleManualArrangement = () => {
-    // Pass uploaded file IDs (pathUrls) so manual-arrange only shows newly uploaded media
-    router.push({
-      pathname: `/trips/${tripId}/upload/manual-arrange`,
-      params: {
-        uploadedFileIds: JSON.stringify(uploadedFileIds),
-      },
-    });
-  };
-
-  const handleAutoArrangement = () => {
-    router.push(`/trips/${tripId}/upload/auto-arrange`);
+    // Navigate to arrangement selection screen
+    router.push(`/trips/${tripId}/upload/arrange-selection`);
   };
 
   const handleDoLater = () => {
@@ -432,51 +423,27 @@ export default function UploadMediaScreen() {
                       <Ionicons name="checkmark-circle" size={48} color={colors.status.success} />
                     </View>
                     <TText weight="bold" style={{ fontSize: 18, textAlign: "center" }}>
-                      Hooray, your media has been successfully uploaded!
+                      Upload complete!
                     </TText>
                     <TText dim style={{ textAlign: "center", marginTop: spacing.md }}>
-                      Now that your media is safely stored it is time to get it organized:
+                      Do you want to organize newly uploaded media now?
                     </TText>
 
                     <View style={{ width: "100%", gap: spacing.md, marginTop: spacing.lg }}>
                       <Pressable
                         onPress={handleManualArrangement}
                         style={{
-                          borderWidth: 2,
-                          borderColor: colors.accent.primary,
-                          borderRadius: radii.md,
-                          padding: spacing.lg,
-                          alignItems: "center",
-                          backgroundColor: colors.accent.primary + "22",
+                          borderRadius: 14,
+                          overflow: "hidden",
+                          minWidth: 110,
                         }}
                       >
-                        <Ionicons name="create-outline" size={32} color={colors.accent.primary} />
-                        <TText weight="bold" style={{ marginTop: spacing.sm, color: colors.accent.primary }}>
-                          Manual Moment Arrangement
-                        </TText>
-                        <TText dim size="sm" style={{ marginTop: spacing.xs, textAlign: "center" }}>
-                          Organize your media into moments yourself
-                        </TText>
-                      </Pressable>
-
-                      <Pressable
-                        onPress={handleAutoArrangement}
-                        style={{
-                          borderWidth: 2,
-                          borderColor: colors.accent.primary,
-                          borderRadius: radii.md,
-                          padding: spacing.lg,
-                          alignItems: "center",
-                          backgroundColor: colors.accent.primary + "22",
-                        }}
-                      >
-                        <Ionicons name="sparkles-outline" size={32} color={colors.accent.primary} />
-                        <TText weight="bold" style={{ marginTop: spacing.sm, color: colors.accent.primary }}>
-                          Auto Moment Arrangement
-                        </TText>
-                        <TText dim size="sm" style={{ marginTop: spacing.xs, textAlign: "center" }}>
-                          Let us organize your media automatically
-                        </TText>
+                        <LinearGradient
+                          colors={[colors.accent.primary, colors.accent.primary]}
+                          style={{ padding: 12, alignItems: "center" }}
+                        >
+                          <TText style={{ color: "#fff" }}>Yes, let's sort now</TText>
+                        </LinearGradient>
                       </Pressable>
 
                       <Pressable
@@ -489,7 +456,7 @@ export default function UploadMediaScreen() {
                           alignItems: "center",
                         }}
                       >
-                        <TText>I'll do that later</TText>
+                        <TText>Let's sort later</TText>
                       </Pressable>
                     </View>
                   </>

@@ -6,16 +6,19 @@ import TText from "./TText";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { router } from "expo-router";
 import { useNotifications } from "../contexts/NotificationContext";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export default function AppHeader({ title, showBell = true, rightElement }) {
   const { colors } = useTheme();
   const { unseenCount } = useNotifications();
+  const insets = useSafeAreaInsets();
 
   return (
     <View
       style={{
+        paddingTop: insets.top + spacing.md,
+        paddingBottom: spacing.lg,
         paddingHorizontal: spacing.xl,
-        paddingVertical: spacing.lg,
         backgroundColor: colors.bg.layer1,
         borderBottomWidth: 1,
         borderBottomColor: colors.border,

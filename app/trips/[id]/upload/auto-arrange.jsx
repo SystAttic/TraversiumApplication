@@ -59,9 +59,11 @@ export default function AutoArrangeScreen() {
     setError(null);
     setStep(2);
 
+    let progressInterval = null;
+
     try {
       // Simulate progress updates
-      const progressInterval = setInterval(() => {
+      progressInterval = setInterval(() => {
         setProgress((prev) => {
           if (prev >= 90) return prev; // Don't go to 100% until API call completes
           return prev + 5;
@@ -71,7 +73,9 @@ export default function AutoArrangeScreen() {
       // Call autosort API
       const sortedTrip = await autosortTrip(trip);
       
-      clearInterval(progressInterval);
+      if (progressInterval) {
+        clearInterval(progressInterval);
+      }
       setProgress(100);
 
       // Small delay to show 100% progress
@@ -84,9 +88,9 @@ export default function AutoArrangeScreen() {
       setTimeout(() => {
         if (sortedTrip) {
           router.push({
-            pathname: `/trips/${tripIdNum}/upload/review`,
+            pathname: `/trips/${tripIdNum}/upload/auto-review`,
             params: {
-              autosorted: "true",
+              originalTrip: JSON.stringify(trip),
               autosortedTrip: JSON.stringify(sortedTrip),
             },
           });
@@ -94,7 +98,14 @@ export default function AutoArrangeScreen() {
       }, 1000);
     } catch (error) {
       console.error("Autosort failed:", error);
-      setError(error.message || "Failed to autosort trip. Please try again.");
+      if (progressInterval) {
+        clearInterval(progressInterval);
+      }
+      setError(
+        error?.response?.data?.message || 
+        error?.message || 
+        "Failed to autosort trip. Please try again."
+      );
       setStep(3);
     } finally {
       setProcessing(false);
@@ -106,14 +117,13 @@ export default function AutoArrangeScreen() {
   };
 
   const handleReview = () => {
-    if (!autosortedTrip) return;
+    if (!autosortedTrip || !trip) return;
 
     // Navigate to review screen with autosorted trip data
-    // We'll pass the autosorted trip as a special parameter
     router.push({
-      pathname: `/trips/${tripIdNum}/upload/review`,
+      pathname: `/trips/${tripIdNum}/upload/auto-review`,
       params: {
-        autosorted: "true",
+        originalTrip: JSON.stringify(trip),
         autosortedTrip: JSON.stringify(autosortedTrip),
       },
     });

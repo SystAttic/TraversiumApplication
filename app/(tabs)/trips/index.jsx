@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef, useMemo, useCallback } from "react";
 import { ScrollView, View, Pressable, RefreshControl } from "react-native";
+import { useFocusEffect } from "@react-navigation/native";
 import Screen from "../../../src/components/Screen";
 import AppHeader from "../../../src/components/AppHeader";
 import SearchBar from "../../../src/components/SearchBar";
@@ -101,6 +102,15 @@ export default function TripsList() {
       setRefreshing(false);
     }
   }, [currentUserId, searchQuery]);
+
+  // Refresh data when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      if (currentUserId) {
+        fetchTrips(false);
+      }
+    }, [currentUserId, fetchTrips])
+  );
 
   // Initial fetch with debounced search
   useEffect(() => {

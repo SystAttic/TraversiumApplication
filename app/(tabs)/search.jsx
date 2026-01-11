@@ -18,6 +18,14 @@ import UserRow from "../../src/components/users/UserRow";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import Ionicons from "@expo/vector-icons/Ionicons";
+import AuthenticatedImage from "../../src/components/AuthenticatedImage";
+import { getMediaFileUrl } from "../../src/services/fileStorageApi";
+import {
+  getSearchHistory,
+  saveItemToHistory,
+  clearSearchHistory,
+  getSearchHistoryByType,
+} from "../../src/utils/searchHistory";
 
 const PAGE_SIZE = 20;
 
@@ -38,6 +46,7 @@ export default function SearchScreen() {
   const [error, setError] = useState(null);
   const [hasMore, setHasMore] = useState(true);
   const [offset, setOffset] = useState(0);
+  const [searchHistory, setSearchHistory] = useState([]);
 
   const debTimer = useRef(null);
   const reqToken = useRef(0);
@@ -67,6 +76,14 @@ export default function SearchScreen() {
       unsubscribe();
     };
   }, []);
+
+  // Load search history
+  useEffect(() => {
+    (async () => {
+      const history = await getSearchHistoryByType(searchType);
+      setSearchHistory(history);
+    })();
+  }, [searchType]);
 
   // Search function with pagination
   const performSearch = useCallback(async (searchOffset = 0, isRefresh = false) => {
@@ -230,9 +247,11 @@ export default function SearchScreen() {
           }}
         >
           <Pressable
-            onPress={() => {
+            onPress={async () => {
               setSearchType("trips");
               setResults([]);
+              const history = await getSearchHistoryByType("trips");
+              setSearchHistory(history);
             }}
             style={{
               flex: 1,
@@ -251,9 +270,11 @@ export default function SearchScreen() {
             </TText>
           </Pressable>
           <Pressable
-            onPress={() => {
+            onPress={async () => {
               setSearchType("users");
               setResults([]);
+              const history = await getSearchHistoryByType("users");
+              setSearchHistory(history);
             }}
             style={{
               flex: 1,
@@ -445,7 +466,19 @@ export default function SearchScreen() {
         {!loading && !refreshing && searchType === "trips" && (
           <View style={{ gap: spacing.md }}>
             {results.map((trip) => (
-              <TripCard key={trip.tripId} trip={trip} />
+              <TripCard 
+                key={trip.tripId} 
+                trip={trip}
+                onPress={async (tripId) => {
+                  // Save to history when trip is clicked
+                  await saveItemToHistory(trip, "trips");
+                  // Refresh history display
+                  const history = await getSearchHistoryByType("trips");
+                  setSearchHistory(history);
+                  // Navigate to trip
+                  router.push(`/trips/${tripId}`);
+                }}
+              />
             ))}
           </View>
         )}
@@ -458,7 +491,13 @@ export default function SearchScreen() {
                 key={user.username || user.userId} 
                 user={user} 
                 rightKind="none"
-                onPress={(user) => {
+                onPress={async (user) => {
+                  // Save to history when user is clicked
+                  await saveItemToHistory(user, "users");
+                  // Refresh history display
+                  const history = await getSearchHistoryByType("users");
+                  setSearchHistory(history);
+                  // Navigate to user
                   router.push(`/users/${encodeURIComponent(user.username)}`);
                 }}
               />
@@ -534,33 +573,152 @@ export default function SearchScreen() {
           </Card>
         )}
 
-        {/* Initial empty state */}
+        {/* Initial empty state with search history */}
         {!loading && !refreshing && !error && results.length === 0 && !q.trim() && (
-          <Card inset>
-            <View style={{ alignItems: "center", padding: spacing.xl }}>
-              <View
-                style={{
-                  width: 64,
-                  height: 64,
-                  borderRadius: 999,
-                  backgroundColor: colors.bg.layer2,
-                  alignItems: "center",
-                  justifyContent: "center",
-                  marginBottom: spacing.md,
-                }}
-              >
-                <Ionicons name="search-outline" size={32} color={colors.text.muted} />
+          <>
+            {searchHistory.length > 0 ? (
+              <View style={{ gap: spacing.md }}>
+                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                  <TText weight="bold" size="md">Recent Searches</TText>
+                  <Pressable
+                    onPress={async () => {
+                      await clearSearchHistory();
+                      setSearchHistory([]);
+                    }}
+                    hitSlop={8}
+                  >
+                    <TText size="sm" style={{ color: colors.accent.primary }}>
+                      Clear
+                    </TText>
+                  </Pressable>
+                </View>
+                <View style={{ gap: spacing.xs }}>
+                  {searchHistory.map((historyItem, index) => {
+                    const item = historyItem.item;
+                    if (!item) return null;
+                    
+                    return (
+                      <Pressable
+                        key={`${historyItem.type}-${item.tripId || item.userId || item.username}-${historyItem.timestamp}-${index}`}
+                        onPress={() => {
+                          if (historyItem.type === "trips") {
+                            router.push(`/trips/${item.tripId}`);
+                          } else {
+                            router.push(`/users/${encodeURIComponent(item.username)}`);
+                          }
+                        }}
+                      >
+                        <Card style={{ padding: spacing.md }}>
+                          <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.md }}>
+                            {historyItem.type === "trips" ? (
+                              <>
+                                {item.coverPhotoUrl ? (
+                                  <AuthenticatedImage
+                                    source={{ uri: getMediaFileUrl(item.coverPhotoUrl) }}
+                                    style={{
+                                      width: 48,
+                                      height: 48,
+                                      borderRadius: radii.md,
+                                    }}
+                                    resizeMode="cover"
+                                  />
+                                ) : (
+                                  <View
+                                    style={{
+                                      width: 48,
+                                      height: 48,
+                                      borderRadius: radii.md,
+                                      backgroundColor: colors.bg.layer2,
+                                      alignItems: "center",
+                                      justifyContent: "center",
+                                    }}
+                                  >
+                                    <Ionicons name="map-outline" size={20} color={colors.text.muted} />
+                                  </View>
+                                )}
+                                <View style={{ flex: 1 }}>
+                                  <TText weight="medium">{item.title || "Untitled Trip"}</TText>
+                                  {item.description && (
+                                    <TText dim size="sm" numberOfLines={1}>
+                                      {item.description}
+                                    </TText>
+                                  )}
+                                </View>
+                              </>
+                            ) : (
+                              <>
+                                {item.avatarPhotoReference ? (
+                                  <AuthenticatedImage
+                                    source={{ uri: getMediaFileUrl(item.avatarPhotoReference) }}
+                                    style={{
+                                      width: 48,
+                                      height: 48,
+                                      borderRadius: 24,
+                                    }}
+                                    resizeMode="cover"
+                                  />
+                                ) : (
+                                  <View
+                                    style={{
+                                      width: 48,
+                                      height: 48,
+                                      borderRadius: 24,
+                                      backgroundColor: colors.bg.layer2,
+                                      alignItems: "center",
+                                      justifyContent: "center",
+                                    }}
+                                  >
+                                    <Ionicons name="person-outline" size={20} color={colors.text.muted} />
+                                  </View>
+                                )}
+                                <View style={{ flex: 1 }}>
+                                  <TText weight="medium">
+                                    {item.displayName || item.firstName || item.username || "User"}
+                                  </TText>
+                                  {item.username && (
+                                    <TText dim size="sm">
+                                      @{item.username}
+                                    </TText>
+                                  )}
+                                </View>
+                              </>
+                            )}
+                            <Ionicons name="arrow-forward" size={18} color={colors.text.muted} />
+                          </View>
+                        </Card>
+                      </Pressable>
+                    );
+                  })}
+                </View>
               </View>
-              <TText weight="bold" style={{ marginBottom: spacing.xs }}>
-                Start searching
-              </TText>
-              <TText dim style={{ textAlign: "center", marginBottom: spacing.lg }}>
-                {searchType === "users"
-                  ? "Search for users by username"
-                  : "Search for trips by title or browse by filter"}
-              </TText>
-            </View>
-          </Card>
+            ) : (
+              <Card inset>
+                <View style={{ alignItems: "center", padding: spacing.xl }}>
+                  <View
+                    style={{
+                      width: 64,
+                      height: 64,
+                      borderRadius: 999,
+                      backgroundColor: colors.bg.layer2,
+                      alignItems: "center",
+                      justifyContent: "center",
+                      marginBottom: spacing.md,
+                    }}
+                  >
+                    <Ionicons name="search-outline" size={32} color={colors.text.muted} />
+                  </View>
+                  <TText weight="bold" style={{ marginBottom: spacing.xs }}>
+                    Start searching
+                  </TText>
+                  <TText dim style={{ textAlign: "center", marginBottom: spacing.lg }}>
+                    {searchType === "users"
+                      ? "Search for users by username"
+                      : "Search for trips by title or browse by filter"}
+                  </TText>
+                </View>
+              </Card>
+            )}
+          </>
         )}
       </ScrollView>
     </Screen>

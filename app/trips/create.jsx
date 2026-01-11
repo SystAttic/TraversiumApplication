@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from "react";
-import { View, ScrollView, TextInput, Pressable, Image, ActivityIndicator, Alert, Share } from "react-native";
+import { View, ScrollView, TextInput, Pressable, Image, ActivityIndicator, Alert } from "react-native";
 import { router } from "expo-router";
 import { useTheme } from "../../src/theme";
 import { spacing, radii } from "../../src/theme/spacing";
@@ -7,7 +7,6 @@ import Screen from "../../src/components/Screen";
 import AppHeader from "../../src/components/AppHeader";
 import Card from "../../src/components/Card";
 import TText from "../../src/components/TText";
-import Button from "../../src/components/Button";
 import ModalConfirm from "../../src/components/ModalConfirm";
 import ProgressSteps from "../../src/components/auth/ProgressSteps";
 import SafeBottomBar from "../../src/components/SafeBottomBar";
@@ -17,7 +16,6 @@ import * as ImagePicker from "expo-image-picker";
 import { createTrip } from "../../src/services/tripApi";
 import { auth } from "../../src/services/firebase";
 import { uploadMediaFile } from "../../src/services/fileStorageApi";
-import * as Clipboard from "expo-clipboard";
 
 export default function CreateTripScreen() {
   const { colors } = useTheme();
@@ -144,43 +142,6 @@ export default function CreateTripScreen() {
     setShowCancelModal(false);
     router.back();
   };
-
-  const handleCopyLink = async () => {
-    if (!createdTrip) return;
-    
-    // Generate invitation link (placeholder - will be enhanced with security later)
-    const invitationLink = `traversium://trips/join?tripId=${createdTrip.tripId}&role=collaborator`;
-    
-    try {
-      await Clipboard.setStringAsync(invitationLink);
-      Alert.alert("Copied!", "Invitation link copied to clipboard");
-    } catch (error) {
-      Alert.alert("Error", "Failed to copy link");
-    }
-  };
-
-  const handleShareLink = async () => {
-    if (!createdTrip) return;
-    
-    // For now, use the deep link. Later this will be https://www.traversium.com/invite?id=...
-    const invitationLink = `traversium://trips/join?tripId=${createdTrip.tripId}&role=collaborator`;
-    
-    try {
-      await Share.share({
-        message: invitationLink,
-        title: "Share Trip Invitation",
-      });
-    } catch (error) {
-      console.error("Share error:", error);
-      // If sharing fails, fallback to copy
-      await handleCopyLink();
-    }
-  };
-
-  // Generate QR code data (placeholder - will be enhanced with security later)
-  const qrData = createdTrip
-    ? JSON.stringify({ tripId: createdTrip.tripId, role: "collaborator" })
-    : null;
 
   return (
     <Screen>
@@ -424,100 +385,48 @@ export default function CreateTripScreen() {
             </>
           )}
 
-          {/* Step 3: Invite Collaborators */}
+          {/* Step 3: Success */}
           {step === 3 && createdTrip && (
             <>
-              <View style={{ gap: 6, marginBottom: spacing.sm, marginTop: spacing.sm }}>
-                <TText weight="bold" style={{ fontSize: 20 }}>
-                  Invite collaborators
-                </TText>
-                <TText dim size="sm">Step 3 of {total}</TText>
-              </View>
-
               <View style={{ gap: spacing.lg, marginTop: spacing.lg, alignItems: "center" }}>
-                {/* QR Code Placeholder */}
-                <View>
-                  <TText weight="medium" size="sm" style={{ marginBottom: spacing.md, textAlign: "center" }}>
-                    Scan to join as collaborator
-                  </TText>
-                  <View
-                    style={{
-                      width: 250,
-                      height: 250,
-                      borderWidth: 2,
-                      borderColor: colors.border,
-                      borderRadius: radii.md,
-                      backgroundColor: colors.bg.layer2,
-                      alignItems: "center",
-                      justifyContent: "center",
-                      padding: spacing.md,
-                    }}
-                  >
-                    <Ionicons name="qr-code-outline" size={120} color={colors.text.muted} />
-                    <TText dim size="sm" style={{ marginTop: spacing.sm, textAlign: "center" }}>
-                      QR Code will be generated here
-                    </TText>
-                    <TText dim size="xs" style={{ marginTop: spacing.xs, textAlign: "center" }}>
-                      (Security implementation pending)
-                    </TText>
-                  </View>
-                </View>
-
-                {/* Shareable Link */}
-                <View style={{ width: "100%", gap: spacing.md }}>
-                  <TText weight="medium" size="sm">Invitation Link</TText>
-                  <View
-                    style={{
-                      flexDirection: "row",
-                      borderWidth: 1,
-                      borderColor: colors.border,
-                      borderRadius: radii.md,
-                      padding: spacing.md,
-                      backgroundColor: colors.bg.layer2,
-                      alignItems: "center",
-                      gap: spacing.sm,
-                    }}
-                  >
-                    <TText
-                      style={{ flex: 1, color: colors.text.primary }}
-                      numberOfLines={1}
-                      ellipsizeMode="middle"
-                    >
-                      {`traversium://trips/join?tripId=${createdTrip.tripId}&role=collaborator`}
-                    </TText>
-                    <Pressable onPress={handleCopyLink} hitSlop={8}>
-                      <Ionicons name="copy-outline" size={20} color={colors.accent.primary} />
-                    </Pressable>
-                    <Pressable
-                      onPress={handleShareLink}
-                      hitSlop={8}
-                      style={{
-                        borderWidth: 1,
-                        borderColor: colors.border,
-                        borderRadius: radii.sm,
-                        padding: spacing.xs,
-                        alignItems: "center",
-                        justifyContent: "center",
-                      }}
-                    >
-                      <Ionicons name="share-social" size={20} color={colors.status.danger} />
-                    </Pressable>
-                  </View>
-                </View>
-              </View>
-
-              <View style={{ flexDirection: "row", justifyContent: "flex-end", marginTop: spacing.xl }}>
-                <Pressable
-                  onPress={() => router.replace(`/trips/${createdTrip.tripId}`)}
-                  style={{ borderRadius: 14, overflow: "hidden", minWidth: 110 }}
+                {/* Success Icon */}
+                <View
+                  style={{
+                    width: 80,
+                    height: 80,
+                    borderRadius: 40,
+                    backgroundColor: colors.status.success + "22",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
                 >
-                  <LinearGradient
-                    colors={[colors.accent.primary, colors.accent.primary]}
-                    style={{ padding: 12, alignItems: "center" }}
+                  <Ionicons name="checkmark-circle" size={64} color={colors.status.success} />
+                </View>
+
+                <TText weight="bold" style={{ fontSize: 24, textAlign: "center" }}>
+                  Yay! Your trip has been created
+                </TText>
+
+                <View style={{ width: "100%", gap: spacing.md, marginTop: spacing.lg }}>
+                  <Pressable
+                    onPress={() => router.replace(`/trips/${createdTrip.tripId}`)}
+                    style={{ borderRadius: 14, overflow: "hidden" }}
                   >
-                    <TText style={{ color: "#fff" }}>Go to Trip</TText>
-                  </LinearGradient>
-                </Pressable>
+                    <LinearGradient
+                      colors={[colors.accent.primary, colors.accent.primary]}
+                      style={{ padding: 12, alignItems: "center" }}
+                    >
+                      <TText style={{ color: "#fff" }}>Let's go to trip</TText>
+                    </LinearGradient>
+                  </Pressable>
+
+                  <Pressable
+                    onPress={() => router.back()}
+                    style={{ alignItems: "center", padding: spacing.sm }}
+                  >
+                    <TText dim>Not now</TText>
+                  </Pressable>
+                </View>
               </View>
             </>
           )}

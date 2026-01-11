@@ -1,11 +1,12 @@
 // app/trips/[id]/index.jsx
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useCallback } from "react";
 import { View, ActivityIndicator, Animated, Pressable } from "react-native";
-import TripMiniHeader from "../../../src/components/trips/TripMiniHeader";
-import TripActivity from "../../../src/components/trips/TripActivity";
+import { useFocusEffect } from "@react-navigation/native";
+import AppHeader from "../../../src/components/AppHeader";
 import GalleryMasonry from "../../../src/components/trips/GalleryMasonry";
 import TripSettings from "../../../src/components/trips/TripSettings";
-import TripBottomBar, { TRIP_BAR_BASE_HEIGHT } from "../../../src/components/trips/TripBottomBar";
+import FloatingActionButton from "../../../src/components/FloatingActionButton";
+import BottomSheet from "../../../src/components/BottomSheet";
 import { useLocalSearchParams } from "expo-router";
 import { getTripById } from "../../../src/services/tripApi";
 import { getMediaFileUrl } from "../../../src/services/fileStorageApi";
@@ -28,122 +29,131 @@ export default function TripScreen() {
   const insets = useSafeAreaInsets();
 
   const [trip, setTrip] = useState(null);
-  const [active, setActive] = useState("timeline"); // timeline | activity | gallery | settings
+  const [active, setActive] = useState("timeline"); // timeline | gallery | settings
   const [loading, setLoading] = useState(true);
+  const [showActionsSheet, setShowActionsSheet] = useState(false);
 
   const scrollY = useRef(new Animated.Value(0)).current;
 
-  useEffect(() => {
-    let on = true;
-    (async () => {
-      try {
-        setLoading(true);
-        const tripIdNum = Number(Array.isArray(id) ? id[0] : id);
-        if (!tripIdNum || isNaN(tripIdNum)) {
-          console.error("Invalid trip ID:", id);
-          return;
-        }
-        
-        const tripData = await getTripById(tripIdNum);
-        if (!on) return;
-        
-        // Transform API response to UI format
-        const currentUserId = auth.currentUser?.uid || null;
-        const isCollaborator = tripData.collaborators?.includes(currentUserId) || false;
-        const isOwner = tripData.ownerId === currentUserId;
-        
-        // Flatten media from all albums
-        const allMedia = [];
-        const moments = [];
-        let unorganizedMediaCount = 0;
-        
-        tripData.albums?.forEach((album) => {
-          // Skip default album for moments list
-          if (album.albumId === tripData.defaultAlbum) {
-            // Count unorganized media (media in default album)
-            const defaultAlbumMedia = album.media?.filter(m => m.pathUrl) || [];
-            unorganizedMediaCount = defaultAlbumMedia.length;
-            
-            // Add media from default album to allMedia
-            defaultAlbumMedia.forEach((m) => {
-              allMedia.push({
-                id: String(m.mediaId),
-                uri: getMediaFileUrl(m.pathUrl),
-                uploader: m.uploader,
-                createdAt: m.createdAt ? new Date(m.createdAt).getTime() : Date.now(),
-              });
-            });
-          } else {
-            // Create moment from album
-            const albumMedia = album.media || [];
-            const coverMedia = albumMedia[0];
-            moments.push({
-              id: String(album.albumId),
-              title: album.title || "Untitled Moment",
-              description: album.description || "",
-              coverUri: coverMedia ? getMediaFileUrl(coverMedia.pathUrl) : null,
-              mediaIds: albumMedia.map((m) => String(m.mediaId)),
-              createdBy: coverMedia?.uploader || tripData.ownerId,
-              createdAt: album.createdAt ? new Date(album.createdAt).getTime() : Date.now(),
-            });
-            
-            // Add media from this album
-            albumMedia.forEach((m) => {
-              if (!m.pathUrl) return; // Skip media without pathUrl
-              allMedia.push({
-                id: String(m.mediaId),
-                uri: getMediaFileUrl(m.pathUrl),
-                uploader: m.uploader,
-                createdAt: m.createdAt ? new Date(m.createdAt).getTime() : Date.now(),
-              });
-            });
-          }
-        });
-        
-        // Transform collaborators/viewers (for now just IDs, will need user API later)
-        const collaborators = tripData.collaborators?.map((firebaseId) => ({
-          id: firebaseId,
-          username: firebaseId, // Placeholder
-          displayName: firebaseId, // Placeholder
-        })) || [];
-        
-        const viewers = tripData.viewers?.map((firebaseId) => ({
-          id: firebaseId,
-          username: firebaseId, // Placeholder
-          displayName: firebaseId, // Placeholder
-        })) || [];
-        
-        const transformedTrip = {
-          id: String(tripData.tripId),
-          tripId: tripData.tripId,
-          title: tripData.title || "",
-          description: tripData.description || "",
-          coverUri: tripData.coverPhotoUrl ? getMediaFileUrl(tripData.coverPhotoUrl) : null,
-          visibility: tripData.visibility || "PRIVATE",
-          ownerId: tripData.ownerId,
-          currentUserId,
-          isCollaborator: isCollaborator || isOwner,
-          isViewer: !isCollaborator && !isOwner,
-          collaborators,
-          viewers,
-          media: allMedia,
-          moments,
-          unorganizedMediaCount,
-          stats: {
-            moments: moments.length,
-            media: allMedia.length,
-          },
-        };
-        
-        setTrip(transformedTrip);
-      } catch (error) {
-        console.error("Failed to load trip:", error);
-      } finally {
-        if (on) setLoading(false);
+  // Load trip data function
+  const loadTripData = useCallback(async () => {
+    try {
+      setLoading(true);
+      const tripIdNum = Number(Array.isArray(id) ? id[0] : id);
+      if (!tripIdNum || isNaN(tripIdNum)) {
+        console.error("Invalid trip ID:", id);
+        return;
       }
-    })();
-    return () => { on = false; };
+      
+      const tripData = await getTripById(tripIdNum);
+      
+      // Transform API response to UI format
+      const currentUserId = auth.currentUser?.uid || null;
+      const isCollaborator = tripData.collaborators?.includes(currentUserId) || false;
+      const isOwner = tripData.ownerId === currentUserId;
+      
+      // Flatten media from all albums
+      const allMedia = [];
+      const moments = [];
+      let unorganizedMediaCount = 0;
+      
+      tripData.albums?.forEach((album) => {
+        // Skip default album for moments list
+        if (album.albumId === tripData.defaultAlbum) {
+          // Count unorganized media (media in default album)
+          const defaultAlbumMedia = album.media?.filter(m => m.pathUrl) || [];
+          unorganizedMediaCount = defaultAlbumMedia.length;
+          
+          // Add media from default album to allMedia
+          defaultAlbumMedia.forEach((m) => {
+            allMedia.push({
+              id: String(m.mediaId),
+              uri: getMediaFileUrl(m.pathUrl),
+              uploader: m.uploader,
+              createdAt: m.createdAt ? new Date(m.createdAt).getTime() : Date.now(),
+            });
+          });
+        } else {
+          // Create moment from album
+          const albumMedia = album.media || [];
+          const coverMedia = albumMedia[0];
+          moments.push({
+            id: String(album.albumId),
+            title: album.title || "Untitled Moment",
+            description: album.description || "",
+            coverUri: coverMedia ? getMediaFileUrl(coverMedia.pathUrl) : null,
+            mediaIds: albumMedia.map((m) => String(m.mediaId)),
+            createdBy: coverMedia?.uploader || tripData.ownerId,
+            createdAt: album.createdAt ? new Date(album.createdAt).getTime() : Date.now(),
+          });
+          
+          // Add media from this album
+          albumMedia.forEach((m) => {
+            if (!m.pathUrl) return; // Skip media without pathUrl
+            allMedia.push({
+              id: String(m.mediaId),
+              uri: getMediaFileUrl(m.pathUrl),
+              uploader: m.uploader,
+              createdAt: m.createdAt ? new Date(m.createdAt).getTime() : Date.now(),
+            });
+          });
+        }
+      });
+      
+      // Transform collaborators/viewers (for now just IDs, will need user API later)
+      const collaborators = tripData.collaborators?.map((firebaseId) => ({
+        id: firebaseId,
+        username: firebaseId, // Placeholder
+        displayName: firebaseId, // Placeholder
+      })) || [];
+      
+      const viewers = tripData.viewers?.map((firebaseId) => ({
+        id: firebaseId,
+        username: firebaseId, // Placeholder
+        displayName: firebaseId, // Placeholder
+      })) || [];
+      
+      const transformedTrip = {
+        id: String(tripData.tripId),
+        tripId: tripData.tripId,
+        title: tripData.title || "",
+        description: tripData.description || "",
+        coverUri: tripData.coverPhotoUrl ? getMediaFileUrl(tripData.coverPhotoUrl) : null,
+        visibility: tripData.visibility || "PRIVATE",
+        ownerId: tripData.ownerId,
+        currentUserId,
+        isCollaborator: isCollaborator || isOwner,
+        isViewer: !isCollaborator && !isOwner,
+        collaborators,
+        viewers,
+        media: allMedia,
+        moments,
+        unorganizedMediaCount,
+        stats: {
+          moments: moments.length,
+          media: allMedia.length,
+        },
+      };
+      
+      setTrip(transformedTrip);
+    } catch (error) {
+      console.error("Failed to load trip:", error);
+    } finally {
+      setLoading(false);
+    }
   }, [id]);
+
+  // Load trip data on mount
+  useEffect(() => {
+    loadTripData();
+  }, [loadTripData]);
+
+  // Refresh trip data when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      loadTripData();
+    }, [loadTripData])
+  );
 
   if (loading || !trip) {
     return (
@@ -168,6 +178,89 @@ export default function TripScreen() {
     extrapolate: "clamp",
   });
 
+  // Create right element for AppHeader with navigation buttons
+  const headerRightElement = (
+    <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm }}>
+      <Pressable
+        onPress={() => setActive("timeline")}
+        hitSlop={8}
+        style={{
+          width: 36,
+          height: 36,
+          borderRadius: 18,
+          alignItems: "center",
+          justifyContent: "center",
+          backgroundColor: active === "timeline" ? colors.accent.primary + "22" : "transparent",
+        }}
+      >
+        <Ionicons
+          name="albums"
+          size={20}
+          color={active === "timeline" ? colors.accent.primary : colors.text.primary}
+        />
+      </Pressable>
+      <Pressable
+        onPress={() => setActive("gallery")}
+        hitSlop={8}
+        style={{
+          width: 36,
+          height: 36,
+          borderRadius: 18,
+          alignItems: "center",
+          justifyContent: "center",
+          backgroundColor: active === "gallery" ? colors.accent.primary + "22" : "transparent",
+        }}
+      >
+        <Ionicons
+          name="images"
+          size={20}
+          color={active === "gallery" ? colors.accent.primary : colors.text.primary}
+        />
+      </Pressable>
+      {/* Only show settings button if user is a collaborator */}
+      {trip?.isCollaborator && (
+        <Pressable
+          onPress={() => setActive("settings")}
+          hitSlop={8}
+          style={{
+            width: 36,
+            height: 36,
+            borderRadius: 18,
+            alignItems: "center",
+            justifyContent: "center",
+            backgroundColor: active === "settings" ? colors.accent.primary + "22" : "transparent",
+          }}
+        >
+          <Ionicons
+            name="settings"
+            size={20}
+            color={active === "settings" ? colors.accent.primary : colors.text.primary}
+          />
+        </Pressable>
+      )}
+    </View>
+  );
+
+  const handleFABPress = () => {
+    setShowActionsSheet(true);
+  };
+
+  const handleAction = (action) => {
+    setShowActionsSheet(false);
+    if (action === "upload") {
+      const tripId = Array.isArray(id) ? id[0] : id;
+      const finalId = String(tripId || trip?.id || trip?.tripId || "");
+      if (finalId) {
+        router.push(`/trips/${finalId}/upload`);
+      } else {
+        console.error("Cannot navigate to upload: no trip ID available");
+      }
+    } else if (action === "arrange") {
+      const tripId = Array.isArray(id) ? id[0] : id;
+      router.push(`/trips/${tripId}/edit-moments`);
+    }
+  };
+
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg.layer1 }}>
       {active === "timeline" ? (
@@ -189,7 +282,7 @@ export default function TripScreen() {
               style={{ flex: 1 }}
               imageStyle={{ opacity: 0.95 }}
             >
-              {/* Back + Share over cover */}
+              {/* Back button and navigation buttons over cover */}
               <View
                 style={{
                   paddingTop: insets.top + 8,
@@ -200,7 +293,23 @@ export default function TripScreen() {
                 }}
               >
                 <RoundBtn icon="arrow-back" onPress={() => router.back()} colors={colors} />
-                <RoundBtn icon="share-social" onPress={() => { /* copy link */ }} colors={colors} />
+                <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm }}>
+                  <RoundBtn 
+                    icon="images" 
+                    onPress={() => setActive("gallery")} 
+                    colors={colors}
+                    isActive={active === "gallery"}
+                  />
+                  {/* Only show settings button if user is a collaborator */}
+                  {trip?.isCollaborator && (
+                    <RoundBtn 
+                      icon="settings" 
+                      onPress={() => setActive("settings")} 
+                      colors={colors}
+                      isActive={active === "settings"}
+                    />
+                  )}
+                </View>
               </View>
 
               {/* Title and gradient overlay near bottom */}
@@ -223,7 +332,7 @@ export default function TripScreen() {
             </AuthenticatedImageBackground>
           </Animated.View>
 
-          {/* Mini header pinned (full width, flush top), only visible after cover */}
+          {/* AppHeader pinned (full width, flush top), only visible after cover */}
           <Animated.View
             style={{
               position: "absolute",
@@ -233,13 +342,12 @@ export default function TripScreen() {
             }}
             pointerEvents="box-none"
           >
-            {/* TripMiniHeader has its own safe-area top padding */}
             <View style={{ opacity: 1 }}>
-              <TripMiniHeader trip={trip} />
+              <AppHeader title={trip.title || "Trip"} showBell={false} rightElement={headerRightElement} />
             </View>
           </Animated.View>
 
-          {/* Timeline content below cover; nothing overlays the status bar now */}
+          {/* Timeline content below cover */}
           <Animated.FlatList
             onScroll={Animated.event(
               [{ nativeEvent: { contentOffset: { y: scrollY } } }],
@@ -297,14 +405,16 @@ export default function TripScreen() {
                   )}
                 </View>
 
-                {/* Unorganized Media Banner */}
-                <UnorganizedMediaBanner
-                  count={trip.unorganizedMediaCount}
-                  onSortPress={() => {
-                    const tripId = Array.isArray(id) ? id[0] : id;
-                    router.push(`/trips/${tripId}/upload/arrange-selection`);
-                  }}
-                />
+                {/* Unorganized Media Banner - Only show for collaborators */}
+                {trip?.isCollaborator && trip.unorganizedMediaCount > 0 && (
+                  <UnorganizedMediaBanner
+                    count={trip.unorganizedMediaCount}
+                    onSortPress={() => {
+                      const tripId = Array.isArray(id) ? id[0] : id;
+                      router.push(`/trips/${tripId}/upload/arrange-selection`);
+                    }}
+                  />
+                )}
               </View>
             }
             renderItem={({ item }) => (
@@ -316,17 +426,26 @@ export default function TripScreen() {
             )}
             ListEmptyComponent={() => <TText dim style={{ padding: spacing.xl }}>No moments yet.</TText>}
             contentContainerStyle={{
-              paddingBottom: TRIP_BAR_BASE_HEIGHT + insets.bottom + spacing.lg, // base bar only
+              paddingBottom: insets.bottom + spacing.xl + 80, // space for FAB
             }}
           />
+
+          {/* FAB overlay for timeline - Only show for collaborators */}
+          {trip?.isCollaborator && (
+            <FloatingActionButton 
+              icon="add" 
+              onPress={handleFABPress}
+              style={{ bottom: spacing.xl + insets.bottom }}
+            />
+          )}
         </>
       ) : (
         <>
-          {/* Pinned mini header for other tabs */}
-          <TripMiniHeader trip={trip} />
-          {active === "activity" && <TripActivity tripId={trip.id} enabled />}
-          {active === "gallery"  && <GalleryMasonry media={trip.media} onOpen={() => {}} />}
-          {active === "settings" && (
+          {/* AppHeader for other tabs */}
+          <AppHeader title={trip.title || "Trip"} showBell={false} rightElement={headerRightElement} />
+          {active === "gallery" && <GalleryMasonry media={trip.media} onOpen={() => {}} />}
+          {/* Only show settings tab if user is a collaborator */}
+          {active === "settings" && trip?.isCollaborator && (
             <TripSettings 
               trip={trip} 
               onTripUpdate={(updatedTrip) => {
@@ -340,43 +459,112 @@ export default function TripScreen() {
               }}
             />
           )}
+          {/* If user tries to access settings but isn't a collaborator, redirect to timeline */}
+          {active === "settings" && !trip?.isCollaborator && (
+            <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+              <TText dim>You don't have permission to view settings for this trip.</TText>
+            </View>
+          )}
         </>
       )}
 
-      {/* Base bottom bar is absolutely positioned; content reserved base height only */}
-      <TripBottomBar 
-        active={active} 
-        onChange={setActive} 
-        onAction={(action) => {
-          if (action === "upload") {
-            // Ensure id is a string (useLocalSearchParams can return array)
-            const tripId = Array.isArray(id) ? id[0] : id;
-            const finalId = String(tripId || trip?.id || trip?.tripId || "");
-            if (finalId) {
-              router.push(`/trips/${finalId}/upload`);
-            } else {
-              console.error("Cannot navigate to upload: no trip ID available");
-            }
-          }
-        }} 
-      />
+      {/* Trip Actions Bottom Sheet - Only show for collaborators */}
+      {trip?.isCollaborator && (
+        <BottomSheet visible={showActionsSheet} onClose={() => setShowActionsSheet(false)} maxHeight="40%">
+          <View style={{ paddingHorizontal: spacing.xl, paddingTop: spacing.md }}>
+            <TText weight="bold" size="lg" style={{ marginBottom: spacing.lg }}>
+              Trip Actions
+            </TText>
+
+            <Pressable
+              onPress={() => handleAction("upload")}
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                padding: spacing.lg,
+                backgroundColor: colors.bg.layer2,
+                borderRadius: 12,
+                borderWidth: 1,
+                borderColor: colors.border,
+                marginBottom: spacing.md,
+              }}
+            >
+              <View
+                style={{
+                  width: 48,
+                  height: 48,
+                  borderRadius: 24,
+                  backgroundColor: colors.accent.primary + "22",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  marginRight: spacing.md,
+                }}
+              >
+                <Ionicons name="cloud-upload" size={24} color={colors.accent.primary} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <TText weight="bold">Upload media</TText>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color={colors.text.muted} />
+            </Pressable>
+
+            <Pressable
+              onPress={() => handleAction("arrange")}
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                padding: spacing.lg,
+                backgroundColor: colors.bg.layer2,
+                borderRadius: 12,
+                borderWidth: 1,
+                borderColor: colors.border,
+                marginBottom: spacing.md,
+              }}
+            >
+              <View
+                style={{
+                  width: 48,
+                  height: 48,
+                  borderRadius: 24,
+                  backgroundColor: colors.accent.primary + "22",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  marginRight: spacing.md,
+                }}
+              >
+                <Ionicons name="reorder-three" size={24} color={colors.accent.primary} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <TText weight="bold">Edit moments</TText>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color={colors.text.muted} />
+            </Pressable>
+          </View>
+        </BottomSheet>
+      )}
     </View>
   );
 }
 
-function RoundBtn({ icon, onPress, colors }) {
+function RoundBtn({ icon, onPress, colors, isActive = false }) {
   return (
     <Pressable
       onPress={onPress}
       style={{
         width: 38, height: 38, borderRadius: 999,
         alignItems:"center", justifyContent:"center",
-        backgroundColor: colors.bg.layer1, opacity: 0.92,
-        borderWidth:1, borderColor: colors.border,
+        backgroundColor: isActive ? colors.accent.primary + "22" : colors.bg.layer1, 
+        opacity: 0.92,
+        borderWidth:1, 
+        borderColor: isActive ? colors.accent.primary : colors.border,
       }}
       hitSlop={8}
     >
-      <Ionicons name={icon} size={18} color={colors.text.primary} />
+      <Ionicons 
+        name={icon} 
+        size={18} 
+        color={isActive ? colors.accent.primary : colors.text.primary} 
+      />
     </Pressable>
   );
 }

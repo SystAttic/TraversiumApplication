@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { ScrollView, RefreshControl } from "react-native";
+import { useFocusEffect } from "@react-navigation/native";
 import Screen from "../../src/components/Screen";
 import AppHeader from "../../src/components/AppHeader";
 import { spacing } from "../../src/theme/spacing";
@@ -46,9 +47,17 @@ export default function ProfileScreen() {
     }
   }, []);
 
+  // Load data on mount
   useEffect(() => {
     loadData(false);
   }, [loadData]);
+
+  // Refresh data when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      loadData(false);
+    }, [loadData])
+  );
 
   const onRefresh = useCallback(() => {
     loadData(true);

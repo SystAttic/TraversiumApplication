@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { View, ScrollView, Pressable, ActivityIndicator, Alert, FlatList, TextInput } from "react-native";
+import { View, ScrollView, Pressable, ActivityIndicator, Alert, FlatList, TextInput, Dimensions } from "react-native";
 import { useLocalSearchParams, router } from "expo-router";
 import Screen from "../../../../src/components/Screen";
 import AppHeader from "../../../../src/components/AppHeader";
@@ -51,6 +51,10 @@ export default function ManualArrangeScreen() {
   const [newAlbumDescription, setNewAlbumDescription] = useState("");
   const [creatingAlbum, setCreatingAlbum] = useState(false);
   const [originalAlbumOrder, setOriginalAlbumOrder] = useState([]); // Track original order for comparison
+  
+  // Selection mode: 'single' or 'multiple'
+  const [selectionMode, setSelectionMode] = useState('single');
+  const [selectedMediaIds, setSelectedMediaIds] = useState(new Set()); // For batch selection
 
   // Load trip data
   useEffect(() => {
@@ -113,37 +117,65 @@ export default function ManualArrangeScreen() {
 
 
   const handleSelectAlbum = (albumId) => {
-    if (!currentMedia) return;
-    setAssignments((prev) => ({
-      ...prev,
-      [currentMedia.mediaId]: albumId,
-    }));
-    // Auto-advance to next media after selection
-    setTimeout(() => {
-      if (currentMediaIndex < unorganizedMedia.length - 1) {
-        setCurrentMediaIndex(currentMediaIndex + 1);
+    if (selectionMode === 'multiple') {
+      // Batch mode: assign all selected media to this album
+      if (selectedMediaIds.size === 0) return;
+      
+      const newAssignments = { ...assignments };
+      selectedMediaIds.forEach(mediaId => {
+        newAssignments[mediaId] = albumId;
+      });
+      setAssignments(newAssignments);
+      
+      // Clear selection
+      setSelectedMediaIds(new Set());
+    } else {
+      // Single mode: assign current media (or unassign if already assigned to this album)
+      if (!currentMedia) return;
+      
+      // If already assigned to this album, unassign it
+      if (currentAssignment === albumId) {
+        setAssignments((prev) => {
+          const newAssignments = { ...prev };
+          delete newAssignments[currentMedia.mediaId];
+          return newAssignments;
+        });
+      } else {
+        // Assign to new album
+        setAssignments((prev) => ({
+          ...prev,
+          [currentMedia.mediaId]: albumId,
+        }));
       }
-    }, 300);
-  };
-
-  const handleMoveAlbum = (index, direction) => {
-    if (direction === "up" && index > 0) {
-      const newAlbums = [...albums];
-      [newAlbums[index - 1], newAlbums[index]] = [newAlbums[index], newAlbums[index - 1]];
-      setAlbums(newAlbums);
-    } else if (direction === "down" && index < albums.length - 1) {
-      const newAlbums = [...albums];
-      [newAlbums[index], newAlbums[index + 1]] = [newAlbums[index + 1], newAlbums[index]];
-      setAlbums(newAlbums);
     }
   };
 
-  const handleSkip = () => {
-    // Move to next media without assigning
-    if (currentMediaIndex < unorganizedMedia.length - 1) {
-      setCurrentMediaIndex(currentMediaIndex + 1);
-    }
+  // Unassign media in batch mode
+  const handleUnassignMedia = (mediaId) => {
+    setAssignments((prev) => {
+      const newAssignments = { ...prev };
+      delete newAssignments[mediaId];
+      return newAssignments;
+    });
   };
+
+  // Batch selection handlers
+  const handleToggleMediaSelection = (mediaId) => {
+    setSelectedMediaIds(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(mediaId)) {
+        newSet.delete(mediaId);
+      } else {
+        newSet.add(mediaId);
+      }
+      return newSet;
+    });
+  };
+
+  const handleDeselectAll = () => {
+    setSelectedMediaIds(new Set());
+  };
+
 
   const handlePrevious = () => {
     if (currentMediaIndex > 0) {
@@ -180,12 +212,10 @@ export default function ManualArrangeScreen() {
         setNewAlbumTitle("");
         setNewAlbumDescription("");
         setShowCreateAlbum(false);
-        // Auto-select the newly created album
-        if (currentMedia) {
+        // Auto-select the newly created album in single mode
+        if (selectionMode === 'single' && currentMedia) {
           handleSelectAlbum(newAlbum.albumId);
         }
-        // Move to next media after creating and assigning
-        handleNext();
       }
     } catch (error) {
       console.error("Failed to create album:", error);
@@ -340,114 +370,211 @@ export default function ManualArrangeScreen() {
 
       <View style={{ flex: 1 }}>
         {/* Media Preview Section */}
-        <View
-          style={{
-            height: 300,
-            backgroundColor: colors.bg.layer2,
-            borderBottomWidth: 1,
-            borderBottomColor: colors.border,
-          }}
-        >
-          <View style={{ flex: 1, position: "relative" }}>
-            {mediaUrl ? (
-              <AuthenticatedImage
-                source={{ uri: mediaUrl }}
-                style={{ width: "100%", height: "100%" }}
-                resizeMode="contain"
-              />
-            ) : (
-              <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.bg.layer3 }}>
-                <Ionicons name="image-outline" size={48} color={colors.text.muted} />
-                <TText dim style={{ marginTop: spacing.sm }}>No image available</TText>
-              </View>
-            )}
+        {selectionMode === 'single' ? (
+          <View
+            style={{
+              height: 300,
+              backgroundColor: colors.bg.layer2,
+              borderBottomWidth: 1,
+              borderBottomColor: colors.border,
+            }}
+          >
+            <View style={{ flex: 1, position: "relative" }}>
+              {mediaUrl ? (
+                <AuthenticatedImage
+                  source={{ uri: mediaUrl }}
+                  style={{ width: "100%", height: "100%" }}
+                  resizeMode="contain"
+                />
+              ) : (
+                <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.bg.layer3 }}>
+                  <Ionicons name="image-outline" size={48} color={colors.text.muted} />
+                  <TText dim style={{ marginTop: spacing.sm }}>No image available</TText>
+                </View>
+              )}
 
-            {/* Navigation Arrows */}
-            {unorganizedMedia.length > 1 && (
-              <>
-                {currentMediaIndex > 0 && (
-                  <Pressable
-                    onPress={handlePrevious}
-                    style={{
-                      position: "absolute",
-                      left: spacing.md,
-                      top: "50%",
-                      transform: [{ translateY: -20 }],
-                      width: 40,
-                      height: 40,
-                      borderRadius: 20,
-                      backgroundColor: colors.bg.layer1 + "E6",
-                      alignItems: "center",
-                      justifyContent: "center",
-                    }}
-                  >
-                    <Ionicons name="chevron-back" size={24} color={colors.text.primary} />
-                  </Pressable>
-                )}
-
-                {currentMediaIndex < unorganizedMedia.length - 1 && (
-                  <Pressable
-                    onPress={handleNext}
-                    style={{
-                      position: "absolute",
-                      right: spacing.md,
-                      top: "50%",
-                      transform: [{ translateY: -20 }],
-                      width: 40,
-                      height: 40,
-                      borderRadius: 20,
-                      backgroundColor: colors.bg.layer1 + "E6",
-                      alignItems: "center",
-                      justifyContent: "center",
-                    }}
-                  >
-                    <Ionicons name="chevron-forward" size={24} color={colors.text.primary} />
-                  </Pressable>
-                )}
-              </>
-            )}
-
-            {/* Media Counter */}
-            <View
-              style={{
-                position: "absolute",
-                top: spacing.md,
-                right: spacing.md,
-                backgroundColor: colors.bg.layer1 + "E6",
-                paddingHorizontal: spacing.md,
-                paddingVertical: spacing.xs,
-                borderRadius: radii.md,
-              }}
-            >
-              <TText size="sm" weight="medium">
-                {currentMediaIndex + 1} / {unorganizedMedia.length}
-              </TText>
-            </View>
-
-            {/* Current Assignment Indicator */}
-            {assignedAlbum && (
+              {/* Media Counter */}
               <View
                 style={{
                   position: "absolute",
-                  bottom: spacing.md,
-                  left: spacing.md,
+                  top: spacing.md,
                   right: spacing.md,
-                  backgroundColor: colors.status.success + "E6",
-                  padding: spacing.sm,
+                  backgroundColor: colors.bg.layer1 + "E6",
+                  paddingHorizontal: spacing.md,
+                  paddingVertical: spacing.xs,
                   borderRadius: radii.md,
-                  flexDirection: "row",
-                  alignItems: "center",
-                  gap: spacing.xs,
                 }}
               >
-                <Ionicons name="checkmark-circle" size={20} color="#fff" />
-                <TText size="sm" style={{ color: "#fff", flex: 1 }} numberOfLines={1}>
-                  Assigned to: {assignedAlbum.title}
+                <TText size="sm" weight="medium">
+                  {currentMediaIndex + 1} / {unorganizedMedia.length}
                 </TText>
               </View>
-            )}
+
+              {/* Current Assignment Indicator with Unassign Option */}
+              {assignedAlbum && (
+                <View
+                  style={{
+                    position: "absolute",
+                    bottom: spacing.md,
+                    left: spacing.md,
+                    right: spacing.md,
+                    backgroundColor: colors.status.success + "E6",
+                    padding: spacing.sm,
+                    borderRadius: radii.md,
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: spacing.xs,
+                  }}
+                >
+                  <Ionicons name="checkmark-circle" size={20} color="#fff" />
+                  <TText size="sm" style={{ color: "#fff", flex: 1 }} numberOfLines={1}>
+                    Assigned to: {assignedAlbum.title}
+                  </TText>
+                  <Pressable
+                    onPress={() => {
+                      setAssignments((prev) => {
+                        const newAssignments = { ...prev };
+                        delete newAssignments[currentMedia.mediaId];
+                        return newAssignments;
+                      });
+                    }}
+                    style={{
+                      padding: spacing.xs,
+                      borderRadius: radii.sm,
+                      backgroundColor: "rgba(255, 255, 255, 0.2)",
+                    }}
+                  >
+                    <Ionicons name="close" size={16} color="#fff" />
+                  </Pressable>
+                </View>
+              )}
+            </View>
           </View>
-        </View>
+        ) : (
+          <View
+            style={{
+              height: 300,
+              backgroundColor: colors.bg.layer2,
+              borderBottomWidth: 1,
+              borderBottomColor: colors.border,
+            }}
+          >
+            <ScrollView
+              contentContainerStyle={{
+                padding: spacing.md,
+                gap: spacing.xs,
+              }}
+            >
+              {/* Deselect All Button */}
+              {selectedMediaIds.size > 0 && (
+                <View style={{ paddingHorizontal: spacing.md, paddingBottom: spacing.xs }}>
+                  <Pressable
+                    onPress={handleDeselectAll}
+                    style={{
+                      alignSelf: "flex-start",
+                      paddingHorizontal: spacing.md,
+                      paddingVertical: spacing.xs,
+                      backgroundColor: colors.bg.layer3,
+                      borderRadius: radii.sm,
+                      borderWidth: 1,
+                      borderColor: colors.border,
+                    }}
+                  >
+                    <TText size="sm">Deselect All ({selectedMediaIds.size})</TText>
+                  </Pressable>
+                </View>
+              )}
+
+              {/* Grid View - 4 images per row */}
+              {(() => {
+                const screenWidth = Dimensions.get('window').width;
+                const itemWidth = (screenWidth - spacing.md * 2 - spacing.xs * 3) / 4;
+                
+                return (
+                  <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.xs }}>
+                    {unorganizedMedia.map((media) => {
+                      const mediaUrl = media.pathUrl ? getMediaFileUrl(media.pathUrl) : null;
+                      const isSelected = selectedMediaIds.has(media.mediaId);
+                      const isAssigned = assignments[media.mediaId];
+                      const assignedAlbum = isAssigned ? albums.find(a => a.albumId === isAssigned) : null;
+                      
+                      return (
+                        <Pressable
+                          key={media.mediaId}
+                          onPress={() => handleToggleMediaSelection(media.mediaId)}
+                          style={{
+                            width: itemWidth,
+                            height: itemWidth,
+                            borderRadius: radii.sm,
+                            overflow: "hidden",
+                            borderWidth: isSelected ? 3 : 1,
+                            borderColor: isSelected ? colors.accent.primary : colors.border,
+                            backgroundColor: colors.bg.layer3,
+                            position: "relative",
+                          }}
+                        >
+                          {mediaUrl ? (
+                            <AuthenticatedImage
+                              source={{ uri: mediaUrl }}
+                              style={{ width: "100%", height: "100%" }}
+                              resizeMode="cover"
+                            />
+                          ) : (
+                            <View style={{ width: "100%", height: "100%", alignItems: "center", justifyContent: "center" }}>
+                              <Ionicons name="image-outline" size={24} color={colors.text.muted} />
+                            </View>
+                          )}
+                          
+                          {/* Selection Checkmark - Top Right */}
+                          {isSelected && (
+                            <View
+                              style={{
+                                position: "absolute",
+                                top: 4,
+                                right: 4,
+                                width: 24,
+                                height: 24,
+                                borderRadius: 12,
+                                backgroundColor: colors.accent.primary,
+                                alignItems: "center",
+                                justifyContent: "center",
+                              }}
+                            >
+                              <Ionicons name="checkmark" size={16} color="#fff" />
+                            </View>
+                          )}
+                          
+                          {/* Assignment Indicator - Bottom Right with unassign option */}
+                          {isAssigned && assignedAlbum && (
+                            <Pressable
+                              onPress={(e) => {
+                                e.stopPropagation();
+                                handleUnassignMedia(media.mediaId);
+                              }}
+                              style={{
+                                position: "absolute",
+                                bottom: 4,
+                                right: 4,
+                                width: 28,
+                                height: 28,
+                                borderRadius: 14,
+                                backgroundColor: colors.status.success,
+                                alignItems: "center",
+                                justifyContent: "center",
+                              }}
+                            >
+                              <Ionicons name="checkmark-circle" size={20} color="#fff" />
+                            </Pressable>
+                          )}
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                );
+              })()}
+            </ScrollView>
+          </View>
+        )}
 
         {/* Moments List Section */}
         <View style={{ flex: 1 }}>
@@ -457,29 +584,106 @@ export default function ManualArrangeScreen() {
               paddingVertical: spacing.md,
               borderBottomWidth: 1,
               borderBottomColor: colors.border,
-              flexDirection: "row",
-              justifyContent: "space-between",
-              alignItems: "center",
+              gap: spacing.md,
             }}
           >
-            <TText weight="bold">Select a Moment</TText>
-            <Pressable
-              onPress={() => setShowCreateAlbum(true)}
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                gap: spacing.xs,
-                paddingHorizontal: spacing.sm,
-                paddingVertical: spacing.xs,
-                backgroundColor: colors.accent.primary + "22",
-                borderRadius: radii.sm,
-              }}
-            >
-              <Ionicons name="add" size={18} color={colors.accent.primary} />
-              <TText size="sm" style={{ color: colors.accent.primary }} weight="medium">
-                New Moment
-              </TText>
-            </Pressable>
+            {/* Selection Mode Toggle - Reduced Size */}
+            <View style={{ flexDirection: "row", gap: spacing.sm }}>
+              <Pressable
+                onPress={() => {
+                  if (selectionMode !== 'single') {
+                    if (selectedMediaIds.size === 1) {
+                      const mediaId = Array.from(selectedMediaIds)[0];
+                      const mediaIndex = unorganizedMedia.findIndex(m => m.mediaId === mediaId);
+                      if (mediaIndex !== -1) {
+                        setCurrentMediaIndex(mediaIndex);
+                      }
+                      setSelectedMediaIds(new Set());
+                      setSelectionMode('single');
+                    } else if (selectedMediaIds.size === 0) {
+                      setSelectionMode('single');
+                    } else {
+                      Alert.alert(
+                        "Cannot Switch Mode",
+                        `Please select exactly 1 image (currently ${selectedMediaIds.size} selected) to switch to single image preview mode.`
+                      );
+                    }
+                  }
+                }}
+                style={{
+                  flex: 1,
+                  paddingVertical: spacing.sm,
+                  paddingHorizontal: spacing.sm,
+                  backgroundColor: selectionMode === 'single' ? colors.accent.primary : colors.bg.layer2,
+                  borderRadius: radii.sm,
+                  borderWidth: 1,
+                  borderColor: selectionMode === 'single' ? colors.accent.primary : colors.border,
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <TText 
+                  weight="medium" 
+                  size="sm"
+                  style={{ 
+                    color: selectionMode === 'single' ? "#fff" : colors.text.primary,
+                  }}
+                >
+                  Single Select
+                </TText>
+              </Pressable>
+              <Pressable
+                onPress={() => {
+                  if (selectionMode !== 'multiple') {
+                    setSelectionMode('multiple');
+                    setSelectedMediaIds(new Set());
+                  }
+                }}
+                style={{
+                  flex: 1,
+                  paddingVertical: spacing.sm,
+                  paddingHorizontal: spacing.sm,
+                  backgroundColor: selectionMode === 'multiple' ? colors.accent.primary : colors.bg.layer2,
+                  borderRadius: radii.sm,
+                  borderWidth: 1,
+                  borderColor: selectionMode === 'multiple' ? colors.accent.primary : colors.border,
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <TText 
+                  weight="medium" 
+                  size="sm"
+                  style={{ 
+                    color: selectionMode === 'multiple' ? "#fff" : colors.text.primary,
+                  }}
+                >
+                  Batch Select
+                </TText>
+              </Pressable>
+            </View>
+
+            {/* Header Row */}
+            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+              <TText weight="bold">Select a Moment</TText>
+              <Pressable
+                onPress={() => setShowCreateAlbum(true)}
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: spacing.xs,
+                  paddingHorizontal: spacing.sm,
+                  paddingVertical: spacing.xs,
+                  backgroundColor: colors.accent.primary + "22",
+                  borderRadius: radii.sm,
+                }}
+              >
+                <Ionicons name="add" size={18} color={colors.accent.primary} />
+                <TText size="sm" style={{ color: colors.accent.primary }} weight="medium">
+                  New Moment
+                </TText>
+              </Pressable>
+            </View>
           </View>
 
           <FlatList
@@ -490,8 +694,13 @@ export default function ManualArrangeScreen() {
               paddingBottom: spacing.md,
               gap: spacing.xs 
             }}
-            renderItem={({ item, index }) => {
-              const isSelected = currentAssignment === item.albumId;
+            renderItem={({ item }) => {
+              // In single mode, check if current media is assigned to this album
+              // In multiple mode, don't highlight moments
+              const isSelected = selectionMode === 'single' 
+                ? currentAssignment === item.albumId
+                : false;
+              
               return (
                 <Pressable
                   onPress={() => handleSelectAlbum(item.albumId)}
@@ -507,41 +716,7 @@ export default function ManualArrangeScreen() {
                     justifyContent: "space-between",
                   }}
                 >
-                  {/* Reorder buttons */}
-                  <View style={{ flexDirection: "row", marginRight: spacing.sm }}>
-                    <Pressable
-                      onPress={() => handleMoveAlbum(index, "up")}
-                      disabled={index === 0}
-                      hitSlop={8}
-                      style={{
-                        opacity: index === 0 ? 0.3 : 1,
-                        padding: spacing.xs,
-                      }}
-                    >
-                      <Ionicons 
-                        name="chevron-up" 
-                        size={16} 
-                        color={colors.text.muted} 
-                      />
-                    </Pressable>
-                    <Pressable
-                      onPress={() => handleMoveAlbum(index, "down")}
-                      disabled={index === albums.length - 1}
-                      hitSlop={8}
-                      style={{
-                        opacity: index === albums.length - 1 ? 0.3 : 1,
-                        padding: spacing.xs,
-                      }}
-                    >
-                      <Ionicons 
-                        name="chevron-down" 
-                        size={16} 
-                        color={colors.text.muted} 
-                      />
-                    </Pressable>
-                  </View>
-
-                  {/* Moment title - single row */}
+                  {/* Moment title */}
                   <View style={{ flex: 1 }}>
                     <TText 
                       weight={isSelected ? "bold" : "normal"} 
@@ -570,31 +745,60 @@ export default function ManualArrangeScreen() {
           />
         </View>
 
-        {/* Skip Button - Fixed at bottom, outside FlatList */}
-        <View
-          style={{
-            paddingHorizontal: spacing.xl,
-            paddingBottom: insets.bottom + spacing.md,
-            paddingTop: spacing.sm,
-            backgroundColor: colors.bg.layer1,
-            borderTopWidth: 1,
-            borderTopColor: colors.border,
-          }}
-        >
-          <Pressable
-            onPress={handleSkip}
+        {/* Navigation Buttons - Fixed at bottom, only in single mode */}
+        {selectionMode === 'single' && (
+          <View
             style={{
-              borderWidth: 1,
-              borderColor: colors.border,
-              borderRadius: radii.sm,
-              paddingVertical: spacing.xs,
-              paddingHorizontal: spacing.sm,
-              alignItems: "center",
+              paddingHorizontal: spacing.xl,
+              paddingBottom: insets.bottom + spacing.md,
+              paddingTop: spacing.sm,
+              backgroundColor: colors.bg.layer1,
+              borderTopWidth: 1,
+              borderTopColor: colors.border,
+              flexDirection: "row",
+              gap: spacing.md,
             }}
           >
-            <TText dim size="sm">Skip for now</TText>
-          </Pressable>
-        </View>
+            <Pressable
+              onPress={handlePrevious}
+              disabled={currentMediaIndex === 0}
+              style={{
+                flex: 1,
+                borderWidth: 1,
+                borderColor: colors.border,
+                borderRadius: radii.sm,
+                paddingVertical: spacing.sm,
+                paddingHorizontal: spacing.md,
+                alignItems: "center",
+                backgroundColor: currentMediaIndex === 0 ? colors.bg.layer3 : colors.bg.layer2,
+                opacity: currentMediaIndex === 0 ? 0.5 : 1,
+              }}
+            >
+              <TText size="sm" style={{ color: currentMediaIndex === 0 ? colors.text.muted : colors.text.primary }}>
+                Previous
+              </TText>
+            </Pressable>
+            <Pressable
+              onPress={handleNext}
+              disabled={currentMediaIndex >= unorganizedMedia.length - 1}
+              style={{
+                flex: 1,
+                borderWidth: 1,
+                borderColor: colors.border,
+                borderRadius: radii.sm,
+                paddingVertical: spacing.sm,
+                paddingHorizontal: spacing.md,
+                alignItems: "center",
+                backgroundColor: currentMediaIndex >= unorganizedMedia.length - 1 ? colors.bg.layer3 : colors.bg.layer2,
+                opacity: currentMediaIndex >= unorganizedMedia.length - 1 ? 0.5 : 1,
+              }}
+            >
+              <TText size="sm" style={{ color: currentMediaIndex >= unorganizedMedia.length - 1 ? colors.text.muted : colors.text.primary }}>
+                Next
+              </TText>
+            </Pressable>
+          </View>
+        )}
       </View>
 
       {/* Create Album Bottom Sheet */}
