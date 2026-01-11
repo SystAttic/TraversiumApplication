@@ -258,6 +258,12 @@ export default function TripScreen() {
     } else if (action === "arrange") {
       const tripId = Array.isArray(id) ? id[0] : id;
       router.push(`/trips/${tripId}/edit-moments`);
+    } else if (action === "sortAll") {
+      const tripId = Array.isArray(id) ? id[0] : id;
+      router.push({
+        pathname: `/trips/${tripId}/upload/manual-arrange`,
+        params: { sortAll: "true" },
+      });
     }
   };
 
@@ -470,7 +476,7 @@ export default function TripScreen() {
 
       {/* Trip Actions Bottom Sheet - Only show for collaborators */}
       {trip?.isCollaborator && (
-        <BottomSheet visible={showActionsSheet} onClose={() => setShowActionsSheet(false)} maxHeight="40%">
+        <BottomSheet visible={showActionsSheet} onClose={() => setShowActionsSheet(false)} maxHeight="50%">
           <View style={{ paddingHorizontal: spacing.xl, paddingTop: spacing.md }}>
             <TText weight="bold" size="lg" style={{ marginBottom: spacing.lg }}>
               Trip Actions
@@ -536,6 +542,38 @@ export default function TripScreen() {
               </View>
               <View style={{ flex: 1 }}>
                 <TText weight="bold">Edit moments</TText>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color={colors.text.muted} />
+            </Pressable>
+
+            <Pressable
+              onPress={() => handleAction("sortAll")}
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                padding: spacing.lg,
+                backgroundColor: colors.bg.layer2,
+                borderRadius: 12,
+                borderWidth: 1,
+                borderColor: colors.border,
+                marginBottom: spacing.md,
+              }}
+            >
+              <View
+                style={{
+                  width: 48,
+                  height: 48,
+                  borderRadius: 24,
+                  backgroundColor: colors.accent.primary + "22",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  marginRight: spacing.md,
+                }}
+              >
+                <Ionicons name="swap-horizontal" size={24} color={colors.accent.primary} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <TText weight="bold">Sort all media</TText>
               </View>
               <Ionicons name="chevron-forward" size={20} color={colors.text.muted} />
             </Pressable>

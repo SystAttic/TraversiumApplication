@@ -19,7 +19,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import AuthenticatedImage from "../../../../src/components/AuthenticatedImage";
 
 export default function ManualArrangeScreen() {
-  const { id: tripId, uploadedFileIds: uploadedFileIdsJson } = useLocalSearchParams();
+  const { id: tripId, uploadedFileIds: uploadedFileIdsJson, sortAll } = useLocalSearchParams();
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
 
@@ -75,28 +75,44 @@ export default function ManualArrangeScreen() {
         setAlbums(otherAlbums);
         setOriginalAlbumOrder(otherAlbums.map(a => a.albumId));
         
-        // Filter media: if uploadedFileIds provided, only show newly uploaded media
-        // Otherwise show all media (for direct navigation to this screen)
-        const allMedia = defaultAlbumData?.media || [];
-        console.log("All media in default album:", allMedia.length);
-        console.log("Uploaded file IDs:", uploadedFileIds);
+        // If sortAll is true, collect media from all albums (moments)
+        // Otherwise, filter media from default album only
+        let filteredMedia = [];
         
-        let filteredMedia = uploadedFileIds && uploadedFileIds.length > 0
-          ? allMedia.filter(media => {
-              if (!media.pathUrl) return false; // Skip media without pathUrl
-              const matches = uploadedFileIds.includes(media.pathUrl);
-              if (!matches && allMedia.length > 0) {
-                console.log("Media pathUrl doesn't match:", media.pathUrl, "vs uploaded IDs:", uploadedFileIds);
+        if (sortAll === "true" || sortAll === true) {
+          // Collect all media from all albums (including moments)
+          const allMediaFromAllAlbums = [];
+          allAlbums.forEach(album => {
+            album.media?.forEach(m => {
+              if (m.pathUrl) { // Skip media without pathUrl
+                allMediaFromAllAlbums.push(m);
               }
-              return matches;
-            })
-          : allMedia.filter(media => media.pathUrl); // Filter out media without pathUrl
-        
-        // Fallback: if filtering resulted in 0 items but we have uploadedFileIds,
-        // show all media from default album (might be a timing issue or mismatch)
-        if (filteredMedia.length === 0 && uploadedFileIds && uploadedFileIds.length > 0 && allMedia.length > 0) {
-          console.warn("Filtering resulted in 0 items, falling back to showing all default album media");
-          filteredMedia = allMedia;
+            });
+          });
+          filteredMedia = allMediaFromAllAlbums;
+        } else {
+          // Original behavior: filter media from default album only
+          const allMedia = defaultAlbumData?.media || [];
+          console.log("All media in default album:", allMedia.length);
+          console.log("Uploaded file IDs:", uploadedFileIds);
+          
+          filteredMedia = uploadedFileIds && uploadedFileIds.length > 0
+            ? allMedia.filter(media => {
+                if (!media.pathUrl) return false; // Skip media without pathUrl
+                const matches = uploadedFileIds.includes(media.pathUrl);
+                if (!matches && allMedia.length > 0) {
+                  console.log("Media pathUrl doesn't match:", media.pathUrl, "vs uploaded IDs:", uploadedFileIds);
+                }
+                return matches;
+              })
+            : allMedia.filter(media => media.pathUrl); // Filter out media without pathUrl
+          
+          // Fallback: if filtering resulted in 0 items but we have uploadedFileIds,
+          // show all media from default album (might be a timing issue or mismatch)
+          if (filteredMedia.length === 0 && uploadedFileIds && uploadedFileIds.length > 0 && allMedia.length > 0) {
+            console.warn("Filtering resulted in 0 items, falling back to showing all default album media");
+            filteredMedia = allMedia;
+          }
         }
         
         console.log("Filtered media count:", filteredMedia.length);
@@ -110,7 +126,7 @@ export default function ManualArrangeScreen() {
       }
     })();
     return () => { on = false; };
-  }, [tripIdNum, uploadedFileIds]);
+  }, [tripIdNum, uploadedFileIds, sortAll]);
 
   const currentMedia = unorganizedMedia[currentMediaIndex];
   const currentAssignment = currentMedia ? assignments[currentMedia.mediaId] : null;
